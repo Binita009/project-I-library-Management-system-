@@ -2,28 +2,19 @@
 require_once '../config/db.php';
 requireAdmin();
 
-// Get statistics
-$total_books = mysqli_query($conn, "SELECT COUNT(*) as count FROM books")->fetch_assoc()['count'];
-$total_members = mysqli_query($conn, "SELECT COUNT(*) as count FROM users WHERE role='member'")->fetch_assoc()['count'];
-$issued_books = mysqli_query($conn, "SELECT COUNT(*) as count FROM issued_books WHERE status='issued'")->fetch_assoc()['count'];
-$overdue_books = mysqli_query($conn, "SELECT COUNT(*) as count FROM issued_books WHERE status='issued' AND due_date < CURDATE()")->fetch_assoc()['count'];
-
-// Recent activities
-$recent_issues = mysqli_query($conn, "SELECT ib.*, b.title, u.full_name 
-                                     FROM issued_books ib 
-                                     JOIN books b ON ib.book_id = b.id 
-                                     JOIN users u ON ib.user_id = u.id 
-                                     ORDER BY ib.issue_date DESC 
-                                     LIMIT 5");
+// Calculate Stats
+$books_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM books"))['c'];
+$students_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM users WHERE role='member'"))['c'];
+$issued_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM issued_books WHERE status='issued'"))['c'];
+$overdue_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM issued_books WHERE status='issued' AND due_date < CURDATE()"))['c'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Library System</title>
+    <title>Admin Dashboard</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <div class="admin-container">
@@ -31,184 +22,107 @@ $recent_issues = mysqli_query($conn, "SELECT ib.*, b.title, u.full_name
         
         <div class="main-content">
             <div class="content-header">
-                <h1>Admin Dashboard</h1>
-                <div class="date-display"><?php echo date('l, F j, Y'); ?></div>
+                <div>
+                    <h1>Dashboard</h1>
+                    <p style="color: #7f8c8d; margin-top: 5px;">Welcome back, here's what's happening today.</p>
+                </div>
+                <div>
+                    <a href="issue_book.php" class="btn btn-primary"><i class="fas fa-plus"></i> Issue New Book</a>
+                </div>
             </div>
             
-            <!-- Stats Cards -->
+            <!-- Stats Grid -->
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-icon books">
+                    <div class="stat-icon" style="background: #4361ee;">
                         <i class="fas fa-book"></i>
                     </div>
-                    <div class="stat-number"><?php echo $total_books; ?></div>
-                    <div class="stat-label">Total Books</div>
+                    <div class="stat-info">
+                        <h3><?= $books_count ?></h3>
+                        <p>Total Books</p>
+                    </div>
                 </div>
                 
                 <div class="stat-card">
-                    <div class="stat-icon users">
+                    <div class="stat-icon" style="background: #3f37c9;">
                         <i class="fas fa-users"></i>
                     </div>
-                    <div class="stat-number"><?php echo $total_members; ?></div>
-                    <div class="stat-label">Students</div>
+                    <div class="stat-info">
+                        <h3><?= $students_count ?></h3>
+                        <p>Students</p>
+                    </div>
                 </div>
                 
                 <div class="stat-card">
-                    <div class="stat-icon issued">
+                    <div class="stat-icon" style="background: #4cc9f0;">
                         <i class="fas fa-book-reader"></i>
                     </div>
-                    <div class="stat-number"><?php echo $issued_books; ?></div>
-                    <div class="stat-label">Books Issued</div>
+                    <div class="stat-info">
+                        <h3><?= $issued_count ?></h3>
+                        <p>Issued Now</p>
+                    </div>
                 </div>
                 
                 <div class="stat-card">
-                    <div class="stat-icon overdue">
-                        <i class="fas fa-exclamation-triangle"></i>
+                    <div class="stat-icon" style="background: #f72585;">
+                        <i class="fas fa-clock"></i>
                     </div>
-                    <div class="stat-number"><?php echo $overdue_books; ?></div>
-                    <div class="stat-label">Overdue Books</div>
+                    <div class="stat-info">
+                        <h3><?= $overdue_count ?></h3>
+                        <p>Overdue</p>
+                    </div>
                 </div>
             </div>
             
-            <!-- Quick Actions -->
-            <div class="quick-actions">
-                <a href="add_book.php" class="action-btn">
-                    <i class="fas fa-plus-circle"></i>
-                    <span>Add New Book</span>
-                </a>
-                <a href="issue_book.php" class="action-btn">
-                    <i class="fas fa-book-medical"></i>
-                    <span>Issue Book</span>
-                </a>
-                <a href="manage_members.php" class="action-btn">
-                    <i class="fas fa-user-plus"></i>
-                    <span>Add Student</span>
-                </a>
-                <a href="return_book.php" class="action-btn">
-                    <i class="fas fa-book-return"></i>
-                    <span>Process Returns</span>
-                </a>
-            </div>
-            
-            <div class="content-row">
-                <!-- Recent Issues -->
-                <div class="card">
-                    <h3>Recent Book Issues</h3>
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Student</th>
-                                    <th>Book</th>
-                                    <th>Issue Date</th>
-                                    <th>Due Date</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if(mysqli_num_rows($recent_issues) > 0): ?>
-                                    <?php while($issue = mysqli_fetch_assoc($recent_issues)): 
-                                        $due_date = new DateTime($issue['due_date']);
-                                        $today = new DateTime();
-                                        $is_overdue = $due_date < $today;
-                                    ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($issue['full_name']); ?></td>
-                                        <td><?php echo htmlspecialchars($issue['title']); ?></td>
-                                        <td><?php echo date('d M Y', strtotime($issue['issue_date'])); ?></td>
-                                        <td><?php echo date('d M Y', strtotime($issue['due_date'])); ?></td>
-                                        <td>
-                                            <span class="badge <?php echo $is_overdue ? 'badge-danger' : 'badge-success'; ?>">
-                                                <?php echo $is_overdue ? 'Overdue' : 'Active'; ?>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    <?php endwhile; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td colspan="5" class="text-center">No recent issues</td>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- Recent Activity -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3>Recent Issues</h3>
+                    <a href="return_book.php" style="color: var(--primary); text-decoration: none; font-size: 14px;">View All</a>
                 </div>
                 
-                <!-- System Status -->
-                <div class="card">
-                    <h3>System Status</h3>
-                    <div class="status-list">
-                        <div class="status-item">
-                            <span class="status-label">Database Connection</span>
-                            <span class="status-indicator active">✓ Connected</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="status-label">Session Status</span>
-                            <span class="status-indicator active">✓ Active</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="status-label">Last Backup</span>
-                            <span class="status-indicator"><?php echo date('Y-m-d H:i'); ?></span>
-                        </div>
-                        <div class="status-item">
-                            <span class="status-label">Users Online</span>
-                            <span class="status-indicator">1</span>
-                        </div>
-                    </div>
-                    <div class="system-info">
-                        <h4>Quick Tips:</h4>
-                        <ul>
-                            <li>Always check book availability before issuing</li>
-                            <li>Monitor overdue books daily</li>
-                            <li>Regularly backup the database</li>
-                            <li>Update book quantities when new stock arrives</li>
-                        </ul>
-                    </div>
-                </div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Book Title</th>
+                            <th>Issue Date</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $recent = mysqli_query($conn, "
+                            SELECT ib.*, u.full_name, b.title 
+                            FROM issued_books ib
+                            JOIN users u ON ib.user_id = u.id
+                            JOIN books b ON ib.book_id = b.id
+                            ORDER BY ib.issue_date DESC LIMIT 5
+                        ");
+                        while($row = mysqli_fetch_assoc($recent)):
+                            $is_overdue = ($row['status'] == 'issued' && strtotime($row['due_date']) < time());
+                        ?>
+                        <tr>
+                            <td style="font-weight: 500;"><?= htmlspecialchars($row['full_name']) ?></td>
+                            <td><?= htmlspecialchars($row['title']) ?></td>
+                            <td><?= date('M d, Y', strtotime($row['issue_date'])) ?></td>
+                            <td><?= date('M d, Y', strtotime($row['due_date'])) ?></td>
+                            <td>
+                                <?php if($row['status'] == 'returned'): ?>
+                                    <span class="badge badge-success">Returned</span>
+                                <?php elseif($is_overdue): ?>
+                                    <span class="badge badge-danger">Overdue</span>
+                                <?php else: ?>
+                                    <span class="badge badge-warning">Issued</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
-    
-    <style>
-        .content-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 25px;
-            margin-top: 30px;
-        }
-        .status-list {
-            margin-bottom: 25px;
-        }
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .status-indicator {
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        .status-indicator.active {
-            background: #d4edda;
-            color: #155724;
-        }
-        .system-info ul {
-            padding-left: 20px;
-            color: #555;
-        }
-        .system-info li {
-            margin-bottom: 8px;
-        }
-        @media (max-width: 992px) {
-            .content-row {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-    
-    <script src="../assets/js/admin.js"></script>
 </body>
 </html>

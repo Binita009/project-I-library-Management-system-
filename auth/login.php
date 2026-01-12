@@ -73,6 +73,18 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="auth-footer">
                     <a href="register.php">Create Account</a>
                 </div>
+                <!-- Inside auth/login.php -->
+<div class="auth-footer">
+    <div style="margin-bottom: 10px;">
+        <small>Demo Accounts:</small><br>
+        <small>• Admin: admin / admin123</small><br>
+        <small>• Student: student / student123</small>
+    </div>
+    <!-- ADD THIS LINE HERE -->
+    <div style="margin-bottom: 15px;"><a href="forgot_password.php">Forgot Password?</a></div>
+    
+    Don't have an account? <a href="register.php">Register here</a>
+</div>
             </form>
         </div>
     </div>
