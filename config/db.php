@@ -1,13 +1,18 @@
 <?php
-session_start();
+// config/db.php
 
-/* Database connection */
-$conn = mysqli_connect("localhost", "root", "", "library_db");
-if (!$conn) {
-    die("Database connection failed");
+// Only start session if one isn't already active
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-/* Login checks */
+$conn = mysqli_connect("localhost", "root", "", "library_db");
+
+if (!$conn) {
+    die("Database connection failed: " . mysqli_connect_error());
+}
+
+/* Auth Helpers */
 function isLoggedIn() {
     return !empty($_SESSION['user_id']);
 }
@@ -20,7 +25,6 @@ function isMember() {
     return isset($_SESSION['role']) && $_SESSION['role'] === 'member';
 }
 
-/* Access control */
 function requireLogin() {
     if (!isLoggedIn()) {
         header("Location: ../auth/login.php");
@@ -39,7 +43,7 @@ function requireAdmin() {
 function requireMember() {
     requireLogin();
     if (!isMember()) {
-        header("Location: ../admin/dashboard.php");
+        header("Location: ../admin/admin_dashboard.php"); // Fixed redirect
         exit();
     }
 }

@@ -2,107 +2,130 @@
 require_once '../config/db.php';
 requireMember();
 
-$user_id = $_SESSION['user_id'];
+$search = $_GET['search'] ?? '';
+
+// Build Query
+$sql = "SELECT * FROM books";
+if ($search) {
+    $sql .= " WHERE title LIKE '%" . mysqli_real_escape_string($conn, $search) . "%' 
+              OR author LIKE '%" . mysqli_real_escape_string($conn, $search) . "%' 
+              OR category LIKE '%" . mysqli_real_escape_string($conn, $search) . "%'";
+}
+$sql .= " ORDER BY title ASC";
+$result = mysqli_query($conn, $sql);
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>My Books</title>
+    <meta charset="UTF-8">
+    <title>Browse Books</title>
+    <!-- Include BOTH style.css and admin.css for the layout -->
     <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/admin.css">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
 
 <div class="admin-container">
-<?php include 'member_sidebar.php'; ?>
+    <!-- Include Sidebar -->
+    <?php include 'member_sidebar.php'; ?>
 
-<div class="main-content">
-<h1>My Issued Books</h1>
+    <div class="main-content">
+        <div class="content-header">
+            <h1>Browse Library Books</h1>
+        </div>
 
-<!-- CURRENT BOOKS -->
-<div class="card">
-<h3>Currently Issued</h3>
+        <!-- Search Bar -->
+        <div class="card">
+            <form method="GET" style="display: flex; gap: 10px;">
+                <input type="text" name="search" class="form-control" 
+                       placeholder="Search by Title, Author, or Category..." 
+                       value="<?= htmlspecialchars($search) ?>">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i> Search
+                </button>
+                <?php if($search): ?>
+                    <a href="books.php" class="btn btn-danger">Clear</a>
+                <?php endif; ?>
+            </form>
+        </div>
 
-<?php
-$stmt = mysqli_prepare($conn,
-    "SELECT b.title, b.author, b.isbn, ib.issue_date, ib.due_date
-     FROM issued_books ib
-     JOIN books b ON ib.book_id=b.id
-     WHERE ib.user_id=? AND ib.status='issued'
-     ORDER BY ib.due_date"
-);
-mysqli_stmt_bind_param($stmt, "i", $user_id);
-mysqli_stmt_execute($stmt);
-$res = mysqli_stmt_get_result($stmt);
-
-if (mysqli_num_rows($res) > 0):
-?>
-<table class="table">
-<tr>
-    <th>Book</th><th>Author</th><th>ISBN</th>
-    <th>Issue</th><th>Due</th><th>Status</th>
-</tr>
-<?php while ($r = mysqli_fetch_assoc($res)):
-    $days = floor((strtotime($r['due_date']) - time()) / 86400);
-?>
-<tr>
-    <td><?= htmlspecialchars($r['title']) ?></td>
-    <td><?= htmlspecialchars($r['author']) ?></td>
-    <td><?= htmlspecialchars($r['isbn']) ?></td>
-    <td><?= date('d M Y', strtotime($r['issue_date'])) ?></td>
-    <td><?= date('d M Y', strtotime($r['due_date'])) ?></td>
-    <td>
-        <?= $days < 0 ? "Overdue" : $days . " days left" ?>
-    </td>
-</tr>
-<?php endwhile; ?>
-</table>
-<?php else: ?>
-<p>No books currently issued.</p>
-<?php endif; ?>
+        <!-- Books Table -->
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ISBN</th>
+                            <th>Title</th>
+                            <th>Author</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (mysqli_num_rows($result) > 0): ?>
+                        <?php while ($book = mysqli_fetch_assoc($result)): 
+                            $is_available = $book['available_copies'] > 0;
+                        ?>
+                        <tr>
+                            <td><?= htmlspecialchars($book['isbn']) ?></td>
+                            <td style="font-weight: bold; color: #2c3e50;">
+                                <?= htmlspecialchars($book['title']) ?>
+                            </td>
+                            <td><?= htmlspecialchars($book['author']) ?></td>
+                            <td><span class="badge-category"><?= htmlspecialchars($book['category']) ?></span></td>
+                            <td>
+                                <?php if ($is_available): ?>
+                                    <span class="status-badge available">
+                                        <i class="fas fa-check-circle"></i> Available (<?= $book['available_copies'] ?>)
+                                    </span>
+                                <?php else: ?>
+                                    <span class="status-badge out-of-stock">
+                                        <i class="fas fa-times-circle"></i> Out of Stock
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 20px;">No books found matching your search.</td>
+                        </tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- HISTORY -->
-<div class="card">
-<h3>Return History</h3>
-
-<?php
-$stmt = mysqli_prepare($conn,
-    "SELECT b.title, b.author, ib.issue_date, ib.return_date
-     FROM issued_books ib
-     JOIN books b ON ib.book_id=b.id
-     WHERE ib.user_id=? AND ib.status='returned'
-     ORDER BY ib.return_date DESC LIMIT 10"
-);
-mysqli_stmt_bind_param($stmt, "i", $user_id);
-mysqli_stmt_execute($stmt);
-$res = mysqli_stmt_get_result($stmt);
-
-if (mysqli_num_rows($res) > 0):
-?>
-<table class="table">
-<tr>
-    <th>Book</th><th>Author</th><th>Issued</th>
-    <th>Returned</th><th>Days Kept</th>
-</tr>
-<?php while ($r = mysqli_fetch_assoc($res)):
-    $kept = floor((strtotime($r['return_date']) - strtotime($r['issue_date'])) / 86400);
-?>
-<tr>
-    <td><?= htmlspecialchars($r['title']) ?></td>
-    <td><?= htmlspecialchars($r['author']) ?></td>
-    <td><?= date('d M Y', strtotime($r['issue_date'])) ?></td>
-    <td><?= date('d M Y', strtotime($r['return_date'])) ?></td>
-    <td><?= $kept ?> days</td>
-</tr>
-<?php endwhile; ?>
-</table>
-<?php else: ?>
-<p>No return history.</p>
-<?php endif; ?>
-</div>
-
-</div>
-</div>
+<style>
+    /* Add some specific styles for this page inline or in css file */
+    .badge-category {
+        background: #ecf0f1;
+        color: #2c3e50;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        border: 1px solid #bdc3c7;
+    }
+    .status-badge {
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+    .status-badge.available {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    .status-badge.out-of-stock {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+</style>
 
 </body>
 </html>
