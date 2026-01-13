@@ -26,7 +26,8 @@ $books = mysqli_query($conn, $sql);
         <div class="main-content">
             <div class="content-header">
                 <h1>Manage Books</h1>
-                <a href="add_book.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Book</a>
+                <a href="add_book.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Book</a>\
+             
             </div>
             
             <div class="card">

@@ -15,6 +15,23 @@ $overdue_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Ensures the links don't change text color */
+        .stats-grid a {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .stat-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            border: 1px solid var(--primary);
+        }
+    </style>
 </head>
 <body>
     <div class="admin-container">
@@ -33,48 +50,60 @@ $overdue_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             
             <!-- Stats Grid -->
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: #4361ee;">
-                        <i class="fas fa-book"></i>
+                <!-- Total Books -->
+                <a href="manage_book.php">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #4361ee;">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3><?= $books_count ?></h3>
+                            <p>Total Books</p>
+                        </div>
                     </div>
-                    <div class="stat-info">
-                        <h3><?= $books_count ?></h3>
-                        <p>Total Books</p>
-                    </div>
-                </div>
+                </a>
                 
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: #3f37c9;">
-                        <i class="fas fa-users"></i>
+                <!-- Students -->
+                <a href="manage_members.php">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #3f37c9;">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3><?= $students_count ?></h3>
+                            <p>Students</p>
+                        </div>
                     </div>
-                    <div class="stat-info">
-                        <h3><?= $students_count ?></h3>
-                        <p>Students</p>
-                    </div>
-                </div>
+                </a>
                 
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: #4cc9f0;">
-                        <i class="fas fa-book-reader"></i>
+                <!-- Issued Now -->
+                <a href="return_book.php">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #4cc9f0;">
+                            <i class="fas fa-book-reader"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3><?= $issued_count ?></h3>
+                            <p>Issued Now</p>
+                        </div>
                     </div>
-                    <div class="stat-info">
-                        <h3><?= $issued_count ?></h3>
-                        <p>Issued Now</p>
-                    </div>
-                </div>
+                </a>
                 
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: #f72585;">
-                        <i class="fas fa-clock"></i>
+                <!-- Overdue -->
+                <a href="return_book.php">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #f72585;">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3><?= $overdue_count ?></h3>
+                            <p>Overdue</p>
+                        </div>
                     </div>
-                    <div class="stat-info">
-                        <h3><?= $overdue_count ?></h3>
-                        <p>Overdue</p>
-                    </div>
-                </div>
+                </a>
             </div>
             
-            <!-- Recent Activity -->
+            <!-- Recent Activity Table -->
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3>Recent Issues</h3>

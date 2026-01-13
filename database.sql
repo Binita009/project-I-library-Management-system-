@@ -57,7 +57,7 @@ CREATE INDEX idx_issued_books_status ON issued_books(status);
 
 -- Default Admin (Password: admin123)
 INSERT INTO users (username, password, full_name, email, role) VALUES
-('admin', '$2y$10$YourHashedPasswordHereOrPlaintextIfLogicIsNotUpdated', 'Library Administrator', 'admin@library.com', 'admin');
+('admin', 'binita123', 'Library Administrator', 'admin@library.com', 'admin');
 -- Note: In your PHP code, the check is manual, but for security, use password_hash('admin123', PASSWORD_DEFAULT)
 
 -- Sample Students (Password: student123)

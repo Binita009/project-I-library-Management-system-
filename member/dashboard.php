@@ -3,140 +3,151 @@ require_once '../config/db.php';
 requireMember();
 
 $user_id   = $_SESSION['user_id'];
-// Defensive coding: Fallback if session name is missing
 $full_name = $_SESSION['full_name'] ?? 'Student';
 
-/* 1. Get Issued Books Count */
+// Issued Books Count
 $issued_count = 0;
 $stmt = mysqli_prepare($conn, "SELECT COUNT(*) FROM issued_books WHERE user_id=? AND status='issued'");
-if ($stmt) {
-    mysqli_stmt_bind_param($stmt, "i", $user_id);
-    mysqli_stmt_execute($stmt);
-    mysqli_stmt_bind_result($stmt, $issued_count);
-    mysqli_stmt_fetch($stmt);
-    mysqli_stmt_close($stmt);
-}
+mysqli_stmt_bind_param($stmt, "i", $user_id);
+mysqli_stmt_execute($stmt);
+mysqli_stmt_bind_result($stmt, $issued_count);
+mysqli_stmt_fetch($stmt);
+mysqli_stmt_close($stmt);
 
-/* 2. Get Overdue Books Count */
+// Overdue Count
 $overdue_count = 0;
 $stmt = mysqli_prepare($conn, "SELECT COUNT(*) FROM issued_books WHERE user_id=? AND status='issued' AND due_date < CURDATE()");
-if ($stmt) {
-    mysqli_stmt_bind_param($stmt, "i", $user_id);
-    mysqli_stmt_execute($stmt);
-    mysqli_stmt_bind_result($stmt, $overdue_count);
-    mysqli_stmt_fetch($stmt);
-    mysqli_stmt_close($stmt);
-}
+mysqli_stmt_bind_param($stmt, "i", $user_id);
+mysqli_stmt_execute($stmt);
+mysqli_stmt_bind_result($stmt, $overdue_count);
+mysqli_stmt_fetch($stmt);
+mysqli_stmt_close($stmt);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard</title>
-    <!-- Core Styles -->
     <link rel="stylesheet" href="../assets/css/style.css">
-    <!-- FIX: Include admin.css because it contains the Sidebar and Stats layout -->
     <link rel="stylesheet" href="../assets/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .stats-grid a {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .stat-card {
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border: 1px solid var(--primary);
+        }
+    </style>
 </head>
 <body>
 
 <div class="admin-container">
-
-    <!-- Sidebar -->
     <?php include 'member_sidebar.php'; ?>
 
-    <!-- Main Content -->
     <div class="main-content">
         <div class="content-header">
-            <h1>Welcome, <?= htmlspecialchars($full_name) ?> 👋</h1>
-            <div class="date-display"><?= date('l, F j, Y') ?></div>
+            <div>
+                <h1>Welcome, <?= htmlspecialchars($full_name) ?> 👋</h1>
+                <p style="color: #7f8c8d;"><?= date('l, F j, Y') ?></p>
+            </div>
         </div>
 
-        <!-- Stats Grid -->
+        <!-- Clickable Stats Grid -->
         <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon" style="background: #3498db;">
-                    <i class="fas fa-book-reader"></i>
+            <!-- Books Issued -->
+            <a href="issued_books.php">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #3498db;">
+                        <i class="fas fa-book-reader"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3><?= $issued_count ?></h3>
+                        <p>Books Issued</p>
+                    </div>
                 </div>
-                <div class="stat-number"><?= $issued_count ?></div>
-                <div class="stat-label">Books Issued</div>
-            </div>
+            </a>
 
-            <div class="stat-card">
-                <div class="stat-icon" style="background: #e74c3c;">
-                    <i class="fas fa-exclamation-circle"></i>
+            <!-- Overdue -->
+            <a href="issued_books.php">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #e74c3c;">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3><?= $overdue_count ?></h3>
+                        <p>Overdue Books</p>
+                    </div>
                 </div>
-                <div class="stat-number"><?= $overdue_count ?></div>
-                <div class="stat-label">Overdue Books</div>
-            </div>
+            </a>
             
-             <div class="stat-card">
-                 <!-- Link to browse books -->
-                <a href="books.php" style="text-decoration:none; color:inherit; display:block;">
+            <!-- Browse Library -->
+            <a href="books.php">
+                <div class="stat-card">
                     <div class="stat-icon" style="background: #2ecc71;">
                         <i class="fas fa-search"></i>
                     </div>
-                    <div class="stat-label" style="font-weight:bold; margin-top:10px;">Browse Library</div>
-                </a>
-            </div>
+                    <div class="stat-info">
+                        <h3 style="font-size: 1.2rem;">Browse</h3>
+                        <p>Find New Books</p>
+                    </div>
+                </div>
+            </a>
         </div>
 
-        <!-- Recent Issued Books Table -->
         <div class="card">
-            <div class="content-header" style="border:none; margin-bottom:10px; padding-bottom:0;">
-                <h3>My Issued Books</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3>Current Readings</h3>
                 <a href="issued_books.php" class="btn btn-primary btn-sm">View All</a>
             </div>
-
-            <?php
-            $query = "SELECT b.title, b.author, ib.issue_date, ib.due_date 
-                      FROM issued_books ib 
-                      JOIN books b ON ib.book_id = b.id 
-                      WHERE ib.user_id = ? AND ib.status = 'issued' 
-                      ORDER BY ib.due_date ASC LIMIT 5";
-            
-            $stmt = mysqli_prepare($conn, $query);
-            mysqli_stmt_bind_param($stmt, "i", $user_id);
-            mysqli_stmt_execute($stmt);
-            $result = mysqli_stmt_get_result($stmt);
-            ?>
 
             <div class="table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Book</th>
+                            <th>Book Title</th>
                             <th>Author</th>
-                            <th>Issue Date</th>
                             <th>Due Date</th>
                             <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                    <?php if (mysqli_num_rows($result) > 0): ?>
-                        <?php while ($r = mysqli_fetch_assoc($result)): 
+                    <?php
+                    $query = "SELECT b.title, b.author, ib.due_date 
+                              FROM issued_books ib 
+                              JOIN books b ON ib.book_id = b.id 
+                              WHERE ib.user_id = ? AND ib.status = 'issued' 
+                              ORDER BY ib.due_date ASC LIMIT 5";
+                    $stmt = mysqli_prepare($conn, $query);
+                    mysqli_stmt_bind_param($stmt, "i", $user_id);
+                    mysqli_stmt_execute($stmt);
+                    $result = mysqli_stmt_get_result($stmt);
+
+                    if (mysqli_num_rows($result) > 0):
+                        while ($r = mysqli_fetch_assoc($result)): 
                             $is_overdue = strtotime($r['due_date']) < time();
-                        ?>
+                    ?>
                         <tr>
-                            <td><?= htmlspecialchars($r['title']) ?></td>
+                            <td style="font-weight: 600;"><?= htmlspecialchars($r['title']) ?></td>
                             <td><?= htmlspecialchars($r['author']) ?></td>
-                            <td><?= date('M d, Y', strtotime($r['issue_date'])) ?></td>
                             <td><?= date('M d, Y', strtotime($r['due_date'])) ?></td>
                             <td>
                                 <?php if($is_overdue): ?>
-                                    <span style="color:white; background:#e74c3c; padding:4px 8px; border-radius:4px; font-size:12px;">Overdue</span>
+                                    <span class="badge badge-danger" style="background:#e74c3c; color:white; padding:4px 8px; border-radius:4px;">Overdue</span>
                                 <?php else: ?>
-                                    <span style="color:white; background:#2ecc71; padding:4px 8px; border-radius:4px; font-size:12px;">Active</span>
+                                    <span class="badge badge-success" style="background:#2ecc71; color:white; padding:4px 8px; border-radius:4px;">Active</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
-                        <?php endwhile; ?>
-                    <?php else: ?>
+                        <?php endwhile; else: ?>
                         <tr>
-                            <td colspan="5" style="text-align:center; padding: 20px;">
-                                No books currently issued. <a href="books.php" style="color: #3498db;">Browse Books</a>
-                            </td>
+                            <td colspan="4" style="text-align:center; padding: 20px;">No books issued. <a href="books.php">Browse now</a></td>
                         </tr>
                     <?php endif; ?>
                     </tbody>
@@ -145,6 +156,5 @@ if ($stmt) {
         </div>
     </div>
 </div>
-
 </body>
 </html>
