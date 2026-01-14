@@ -4,10 +4,11 @@ requireMember();
 
 $user_id = $_SESSION['user_id'];
 
-// Query 1: Active Books (Issued)
-$sql_active = "SELECT ib.*, b.title, b.author, b.isbn 
+// Query: Active Books (Issued) - LEFT JOIN with book_copies to get unique_code
+$sql_active = "SELECT ib.*, b.title, b.author, bc.unique_code 
                FROM issued_books ib 
                JOIN books b ON ib.book_id = b.id 
+               LEFT JOIN book_copies bc ON ib.copy_id = bc.id
                WHERE ib.user_id = ? AND ib.status = 'issued' 
                ORDER BY ib.due_date ASC";
 $stmt = mysqli_prepare($conn, $sql_active);
@@ -15,10 +16,11 @@ mysqli_stmt_bind_param($stmt, "i", $user_id);
 mysqli_stmt_execute($stmt);
 $res_active = mysqli_stmt_get_result($stmt);
 
-// Query 2: Returned History
-$sql_history = "SELECT ib.*, b.title, b.author 
+// Query: History
+$sql_history = "SELECT ib.*, b.title, b.author, bc.unique_code 
                 FROM issued_books ib 
                 JOIN books b ON ib.book_id = b.id 
+                LEFT JOIN book_copies bc ON ib.copy_id = bc.id
                 WHERE ib.user_id = ? AND ib.status = 'returned' 
                 ORDER BY ib.return_date DESC LIMIT 10";
 $stmt2 = mysqli_prepare($conn, $sql_history);
@@ -47,16 +49,13 @@ $res_history = mysqli_stmt_get_result($stmt2);
 
         <!-- SECTION 1: ACTIVELY ISSUED BOOKS -->
         <div class="card">
-            <h3 style="border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px;">
-                <i class="fas fa-book-reader"></i> Currently Reading
-            </h3>
-            
+            <h3><i class="fas fa-book-reader"></i> Currently Reading</h3>
             <div class="table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
                             <th>Book Title</th>
-                            <th>Author</th>
+                            <th>Unique Code</th> <!-- Added Column -->
                             <th>Issue Date</th>
                             <th>Due Date</th>
                             <th>Status</th>
@@ -65,62 +64,58 @@ $res_history = mysqli_stmt_get_result($stmt2);
                     <tbody>
                     <?php if (mysqli_num_rows($res_active) > 0): ?>
                         <?php while ($row = mysqli_fetch_assoc($res_active)): 
-                            $due = strtotime($row['due_date']);
-                            $today = time();
-                            $days_left = ceil(($due - $today) / 86400);
-                            $is_overdue = $days_left < 0;
+                            $is_overdue = strtotime($row['due_date']) < time();
                         ?>
                         <tr style="<?= $is_overdue ? 'background-color: #fff5f5;' : '' ?>">
-                            <td style="font-weight:600"><?= htmlspecialchars($row['title']) ?></td>
-                            <td><?= htmlspecialchars($row['author']) ?></td>
+                            <td style="font-weight:600">
+                                <?= htmlspecialchars($row['title']) ?>
+                                <div style="font-size:12px; color:#666;"><?= htmlspecialchars($row['author']) ?></div>
+                            </td>
+                            <td>
+                                <!-- Unique Code Display -->
+                                <span style="background: #e1f5fe; color: #0277bd; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px;">
+                                    <?= $row['unique_code'] ? htmlspecialchars($row['unique_code']) : 'N/A' ?>
+                                </span>
+                            </td>
                             <td><?= date('M d, Y', strtotime($row['issue_date'])) ?></td>
                             <td><?= date('M d, Y', strtotime($row['due_date'])) ?></td>
                             <td>
                                 <?php if ($is_overdue): ?>
-                                    <span class="badge badge-danger">Overdue by <?= abs($days_left) ?> days</span>
+                                    <span class="badge badge-danger">Overdue</span>
                                 <?php else: ?>
-                                    <span class="badge badge-success"><?= $days_left ?> days left</span>
+                                    <span class="badge badge-success">Active</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
-                        <tr><td colspan="5" class="text-center">You have no books currently issued.</td></tr>
+                        <tr><td colspan="5" class="text-center">No books currently issued.</td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>
             </div>
         </div>
-
-        <!-- SECTION 2: RETURN HISTORY -->
+        
+        <!-- History Section (Optional, included for consistency) -->
         <div class="card" style="margin-top: 30px;">
-            <h3 style="border-bottom: 2px solid #95a5a6; padding-bottom: 10px; margin-bottom: 20px;">
-                <i class="fas fa-history"></i> Return History
-            </h3>
-
+            <h3><i class="fas fa-history"></i> History</h3>
             <div class="table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
                             <th>Book Title</th>
-                            <th>Issue Date</th>
-                            <th>Return Date</th>
-                            <th>Status</th>
+                            <th>Unique Code</th>
+                            <th>Returned On</th>
                         </tr>
                     </thead>
                     <tbody>
-                    <?php if (mysqli_num_rows($res_history) > 0): ?>
-                        <?php while ($row = mysqli_fetch_assoc($res_history)): ?>
+                    <?php while ($row = mysqli_fetch_assoc($res_history)): ?>
                         <tr>
                             <td><?= htmlspecialchars($row['title']) ?></td>
-                            <td><?= date('M d, Y', strtotime($row['issue_date'])) ?></td>
+                            <td style="color: #666; font-family: monospace;"><?= $row['unique_code'] ?></td>
                             <td><?= date('M d, Y', strtotime($row['return_date'])) ?></td>
-                            <td><span class="badge badge-gray">Returned</span></td>
                         </tr>
-                        <?php endwhile; ?>
-                    <?php else: ?>
-                        <tr><td colspan="4" class="text-center">No history available.</td></tr>
-                    <?php endif; ?>
+                    <?php endwhile; ?>
                     </tbody>
                 </table>
             </div>
@@ -128,14 +123,5 @@ $res_history = mysqli_stmt_get_result($stmt2);
 
     </div>
 </div>
-
-<style>
-    .badge { padding: 5px 10px; border-radius: 4px; color: white; font-size: 12px; font-weight: bold; }
-    .badge-success { background: #2ecc71; }
-    .badge-danger { background: #e74c3c; }
-    .badge-gray { background: #95a5a6; }
-    .text-center { text-align: center; }
-</style>
-
 </body>
 </html>

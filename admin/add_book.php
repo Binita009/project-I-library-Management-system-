@@ -1,55 +1,60 @@
 <?php
 require_once '../config/db.php';
-require_once '../config/validation.php'; // Using your validation class
+require_once '../config/validation.php';
 requireAdmin();
 
 $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // 1. Sanitize Inputs
     $title    = Validation::sanitize($_POST['title']);
     $author   = Validation::sanitize($_POST['author']);
     $isbn     = Validation::sanitize($_POST['isbn']);
     $category = Validation::sanitize($_POST['category']);
     $copies   = (int)$_POST['copies'];
 
-    // 2. Server-side Validation
     if (empty($title) || empty($author) || empty($isbn) || $copies < 1) {
         $error = "Please fill all required fields correctly.";
     } else {
-        // 3. Check if ISBN already exists
-        $check_sql = "SELECT id FROM books WHERE isbn = ?";
-        $check_stmt = mysqli_prepare($conn, $check_sql);
-        mysqli_stmt_bind_param($check_stmt, "s", $isbn);
-        mysqli_stmt_execute($check_stmt);
-        mysqli_stmt_store_result($check_stmt);
-
-        if (mysqli_stmt_num_rows($check_stmt) > 0) {
-            $error = "A book with this ISBN already exists in the system.";
-        } else {
-            // 4. Insert into Database
-            // Note: available_copies is set equal to total_copies on initial add
-            $insert_sql = "INSERT INTO books (title, author, isbn, category, total_copies, available_copies) 
-                           VALUES (?, ?, ?, ?, ?, ?)";
+        // 1. Insert the main Book info
+        mysqli_begin_transaction($conn);
+        try {
+            // Check if ISBN exists to avoid duplicates in title info (Optional logic, handled by UNIQUE constraint usually)
+            $insert_book = "INSERT INTO books (title, author, isbn, category, total_copies, available_copies) 
+                            VALUES (?, ?, ?, ?, ?, ?)";
+            $stmt = mysqli_prepare($conn, $insert_book);
+            mysqli_stmt_bind_param($stmt, "ssssii", $title, $author, $isbn, $category, $copies, $copies);
+            mysqli_stmt_execute($stmt);
             
-            if ($stmt = mysqli_prepare($conn, $insert_sql)) {
-                mysqli_stmt_bind_param($stmt, "ssssii", $title, $author, $isbn, $category, $copies, $copies);
+            // Get the ID of the book we just inserted
+            $book_id = mysqli_insert_id($conn);
+            
+            // 2. Generate Unique Codes for EACH copy
+            $insert_copy = "INSERT INTO book_copies (book_id, unique_code, status) VALUES (?, ?, 'available')";
+            $stmt_copy = mysqli_prepare($conn, $insert_copy);
+            
+            for ($i = 1; $i <= $copies; $i++) {
+                // Generate Code: ISBN + Random String + Sequence
+                // Example: 978123-A1B2-1
+                $random_str = strtoupper(substr(md5(time() . rand()), 0, 4));
+                $unique_code = $isbn . "-" . $random_str . "-" . $i;
                 
-                if (mysqli_stmt_execute($stmt)) {
-                    $success = "Book added successfully!";
-                    // Clear post data so form is empty after success
-                    $_POST = array(); 
-                } else {
-                    $error = "Something went wrong. Please try again.";
-                }
-                mysqli_stmt_close($stmt);
+                mysqli_stmt_bind_param($stmt_copy, "is", $book_id, $unique_code);
+                mysqli_stmt_execute($stmt_copy);
             }
+            
+            mysqli_commit($conn);
+            $success = "Book added successfully! $copies unique codes generated.";
+            $_POST = array(); 
+            
+        } catch (Exception $e) {
+            mysqli_rollback($conn);
+            $error = "Error: " . $e->getMessage();
         }
-        mysqli_stmt_close($check_stmt);
     }
 }
 ?>
+<!-- Keep the HTML Form exactly as it is in your original file -->
 
 <!DOCTYPE html>
 <html lang="en">

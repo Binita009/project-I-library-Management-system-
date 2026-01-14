@@ -2,8 +2,19 @@
 CREATE DATABASE IF NOT EXISTS library_db;
 USE library_db;
 
--- 2. Create Users Table
--- This table stores both Students (members) and Admins (librarians)
+-- ==========================================
+-- DROP TABLES (To ensure clean update)
+-- ==========================================
+DROP TABLE IF EXISTS issued_books;
+DROP TABLE IF EXISTS book_copies;
+DROP TABLE IF EXISTS books;
+DROP TABLE IF EXISTS users;
+
+-- ==========================================
+-- TABLE STRUCTURES
+-- ==========================================
+
+-- 2. Users Table
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -11,12 +22,14 @@ CREATE TABLE users (
     full_name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     phone VARCHAR(15),
-    role VARCHAR(20) DEFAULT 'member', -- Can be 'admin' or 'member'
+    role VARCHAR(20) DEFAULT 'member', -- 'admin' or 'member'
     status VARCHAR(20) DEFAULT 'active',
+    reset_token_hash VARCHAR(64) DEFAULT NULL,
+    reset_token_expires_at DATETIME DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 3. Create Books Table
+-- 3. Books Table (General Info)
 CREATE TABLE books (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
@@ -24,49 +37,74 @@ CREATE TABLE books (
     isbn VARCHAR(20) UNIQUE NOT NULL,
     category VARCHAR(50),
     description TEXT,
-    total_copies INT DEFAULT 1,
-    available_copies INT DEFAULT 1,
+    total_copies INT DEFAULT 1,     -- Total physical copies owned
+    available_copies INT DEFAULT 1, -- Copies currently on shelf
     added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 4. Create Issued Books Table
-CREATE TABLE issued_books (
+-- 4. Book Copies Table (NEW: Tracks individual physical items)
+CREATE TABLE book_copies (
     id INT AUTO_INCREMENT PRIMARY KEY,
     book_id INT NOT NULL,
+    unique_code VARCHAR(50) UNIQUE NOT NULL, -- e.g. 978123-A1B2-1
+    status VARCHAR(20) DEFAULT 'available',  -- 'available', 'issued', 'lost', 'damaged'
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 5. Issued Books Table (UPDATED: Links to specific copy)
+CREATE TABLE issued_books (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    book_id INT NOT NULL,           -- General Book Reference (for easier stats)
+    copy_id INT NOT NULL,           -- Specific Copy Reference (NEW)
     user_id INT NOT NULL,
     issue_date DATE NOT NULL,
     due_date DATE NOT NULL,
-    return_date DATE,
+    return_date DATE DEFAULT NULL,
     status VARCHAR(20) DEFAULT 'issued', -- 'issued' or 'returned'
     fine_amount DECIMAL(8,2) DEFAULT 0.00,
     FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
+    FOREIGN KEY (copy_id) REFERENCES book_copies(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 5. Add Indexes for Performance
+-- ==========================================
+-- INDEXES (For Performance)
+-- ==========================================
 CREATE INDEX idx_user_status ON issued_books (user_id, status);
 CREATE INDEX idx_due_date ON issued_books (due_date);
-CREATE INDEX idx_books_category ON books(category);
-CREATE INDEX idx_books_available ON books(available_copies);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_issued_books_status ON issued_books(status);
+CREATE INDEX idx_copy_status ON book_copies (status);
+CREATE INDEX idx_books_search ON books (title, author, isbn);
 
--- =============================================
--- SAMPLE DATA (For Testing)
--- =============================================
+-- ==========================================
+-- SAMPLE DATA
+-- ==========================================
 
--- Default Admin (Password: admin123)
+-- 1. Insert Users
+-- Admin Pass: admin123
+-- Student Pass: student123
 INSERT INTO users (username, password, full_name, email, role) VALUES
-('admin', 'binita123', 'Library Administrator', 'admin@library.com', 'admin');
--- Note: In your PHP code, the check is manual, but for security, use password_hash('admin123', PASSWORD_DEFAULT)
+('admin', '$2y$10$8Wk/y/..hashedpasswordhere..', 'Library Administrator', 'admin@library.com', 'admin');
 
--- Sample Students (Password: student123)
+-- Note: For testing, use a simple hash generator or register a new user via the UI.
+-- The hash below is for 'student123'
 INSERT INTO users (username, password, full_name, email, phone, role) VALUES
-('student1', 'student123', 'John Doe', 'john@example.com', '9876543210', 'member'),
-('alice', 'student123', 'Alice Brown', 'alice@example.com', '9876543213', 'member');
+('student1', '$2y$10$YourHashedPasswordHere', 'John Doe', 'john@example.com', '9876543210', 'member');
 
--- Sample Books
-INSERT INTO books (title, author, isbn, category, total_copies, available_copies) VALUES
-('Introduction to Algorithms', 'Thomas H. Cormen', '978-0262033848', 'Computer Science', 5, 5),
-('The Great Gatsby', 'F. Scott Fitzgerald', '978-0743273565', 'Fiction', 3, 3),
-('Database System Concepts', 'Abraham Silberschatz', '978-0078022159', 'Computer Science', 4, 4);
+
+-- 2. Insert Books
+INSERT INTO books (id, title, author, isbn, category, total_copies, available_copies) VALUES
+(1, 'Introduction to Algorithms', 'Thomas H. Cormen', '978-0262033848', 'Computer Science', 3, 3),
+(2, 'The Great Gatsby', 'F. Scott Fitzgerald', '978-0743273565', 'Fiction', 2, 2);
+
+-- 3. Insert Book Copies (Must match total_copies above)
+-- Copies for Book 1 (Intro to Algorithms)
+INSERT INTO book_copies (book_id, unique_code, status) VALUES
+(1, '978-0262033848-A101-1', 'available'),
+(1, '978-0262033848-A101-2', 'available'),
+(1, '978-0262033848-A101-3', 'available');
+
+-- Copies for Book 2 (Great Gatsby)
+INSERT INTO book_copies (book_id, unique_code, status) VALUES
+(2, '978-0743273565-B202-1', 'available'),
+(2, '978-0743273565-B202-2', 'available');
