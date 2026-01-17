@@ -4,7 +4,7 @@ requireMember();
 
 $user_id = $_SESSION['user_id'];
 
-// Query: Active Books (Issued) - LEFT JOIN with book_copies to get unique_code
+// 1. Currently Issued
 $sql_active = "SELECT ib.*, b.title, b.author, bc.unique_code 
                FROM issued_books ib 
                JOIN books b ON ib.book_id = b.id 
@@ -16,7 +16,7 @@ mysqli_stmt_bind_param($stmt, "i", $user_id);
 mysqli_stmt_execute($stmt);
 $res_active = mysqli_stmt_get_result($stmt);
 
-// Query: History
+// 2. History
 $sql_history = "SELECT ib.*, b.title, b.author, bc.unique_code 
                 FROM issued_books ib 
                 JOIN books b ON ib.book_id = b.id 
@@ -47,43 +47,48 @@ $res_history = mysqli_stmt_get_result($stmt2);
             <h1>My Books</h1>
         </div>
 
-        <!-- SECTION 1: ACTIVELY ISSUED BOOKS -->
+        <!-- Currently Reading -->
         <div class="card">
-            <h3><i class="fas fa-book-reader"></i> Currently Reading</h3>
+            <h3>Currently Reading</h3>
             <div class="table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
                             <th>Book Title</th>
-                            <th>Unique Code</th> <!-- Added Column -->
-                            <th>Issue Date</th>
+                            <th>Code</th>
                             <th>Due Date</th>
                             <th>Status</th>
+                            <th>Est. Fine</th>
                         </tr>
                     </thead>
                     <tbody>
                     <?php if (mysqli_num_rows($res_active) > 0): ?>
                         <?php while ($row = mysqli_fetch_assoc($res_active)): 
-                            $is_overdue = strtotime($row['due_date']) < time();
+                            $due_date = new DateTime($row['due_date']);
+                            $today = new DateTime();
+                            $is_overdue = $today > $due_date;
+                            $est_fine = 0;
+                            if($is_overdue) {
+                                $days = $today->diff($due_date)->days;
+                                $est_fine = $days * 2;
+                            }
                         ?>
                         <tr style="<?= $is_overdue ? 'background-color: #fff5f5;' : '' ?>">
-                            <td style="font-weight:600">
-                                <?= htmlspecialchars($row['title']) ?>
-                                <div style="font-size:12px; color:#666;"><?= htmlspecialchars($row['author']) ?></div>
-                            </td>
-                            <td>
-                                <!-- Unique Code Display -->
-                                <span style="background: #e1f5fe; color: #0277bd; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px;">
-                                    <?= $row['unique_code'] ? htmlspecialchars($row['unique_code']) : 'N/A' ?>
-                                </span>
-                            </td>
-                            <td><?= date('M d, Y', strtotime($row['issue_date'])) ?></td>
+                            <td style="font-weight:600"><?= htmlspecialchars($row['title']) ?></td>
+                            <td><span style="background: #e1f5fe; padding: 2px 6px; border-radius: 4px; font-family: monospace;"><?= htmlspecialchars($row['unique_code'] ?? 'N/A') ?></span></td>
                             <td><?= date('M d, Y', strtotime($row['due_date'])) ?></td>
                             <td>
                                 <?php if ($is_overdue): ?>
-                                    <span class="badge badge-danger">Overdue</span>
+                                    <span style="color: red; font-weight: bold;">Overdue</span>
                                 <?php else: ?>
-                                    <span class="badge badge-success">Active</span>
+                                    <span style="color: green;">Active</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($est_fine > 0): ?>
+                                    <span style="color: red; font-weight: bold;">NRS <?= $est_fine ?></span>
+                                <?php else: ?>
+                                    -
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -96,31 +101,36 @@ $res_history = mysqli_stmt_get_result($stmt2);
             </div>
         </div>
         
-        <!-- History Section (Optional, included for consistency) -->
+        <!-- History -->
         <div class="card" style="margin-top: 30px;">
-            <h3><i class="fas fa-history"></i> History</h3>
+            <h3>History</h3>
             <div class="table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
                             <th>Book Title</th>
-                            <th>Unique Code</th>
                             <th>Returned On</th>
+                            <th>Fine Paid</th>
                         </tr>
                     </thead>
                     <tbody>
                     <?php while ($row = mysqli_fetch_assoc($res_history)): ?>
                         <tr>
                             <td><?= htmlspecialchars($row['title']) ?></td>
-                            <td style="color: #666; font-family: monospace;"><?= $row['unique_code'] ?></td>
                             <td><?= date('M d, Y', strtotime($row['return_date'])) ?></td>
+                            <td>
+                                <?php if ($row['fine_amount'] > 0): ?>
+                                    <span class="badge badge-danger">NRS <?= $row['fine_amount'] ?></span>
+                                <?php else: ?>
+                                    <span style="color: #999;">0</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endwhile; ?>
                     </tbody>
                 </table>
             </div>
         </div>
-
     </div>
 </div>
 </body>

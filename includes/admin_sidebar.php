@@ -39,10 +39,17 @@ $path = (basename(dirname($_SERVER['PHP_SELF'])) == 'admin') ? '' : '../';
             <i class="fas fa-undo-alt"></i>
             <span>Returns</span>
         </a>
+        
+        <!-- NEW FINES LINK -->
+        <a href="fines.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'fines.php' ? 'active' : ''; ?>">
+            <i class="fas fa-coins"></i>
+            <span>Fines</span>
+        </a>
+
         <a href="reports.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>">
-    <i class="fas fa-chart-bar"></i>
-    <span>Reports</span>
-    </a>
+            <i class="fas fa-chart-bar"></i>
+            <span>Reports</span>
+        </a>
         
         <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
             <a href="../auth/logout.php" class="menu-item" style="color: #ff6b6b;">

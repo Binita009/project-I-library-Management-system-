@@ -5,9 +5,32 @@ requireMember();
 $user_id   = $_SESSION['user_id'];
 $full_name = $_SESSION['full_name'] ?? 'Student';
 
-// Counts
-$issued_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM issued_books WHERE user_id=$user_id AND status='issued'"))['c'];
-$overdue_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM issued_books WHERE user_id=$user_id AND status='issued' AND due_date < CURDATE()"))['c'];
+// Initialize Counters
+$issued_count = 0;
+$overdue_count = 0;
+$total_pending_fine = 0;
+
+// Fetch all issued books to calculate stats
+$sql_stats = "SELECT due_date FROM issued_books WHERE user_id = $user_id AND status = 'issued'";
+$result_stats = mysqli_query($conn, $sql_stats);
+
+while($row = mysqli_fetch_assoc($result_stats)) {
+    $issued_count++;
+    
+    // Date Logic
+    $due_date = new DateTime($row['due_date']);
+    $due_date->setTime(0, 0, 0); // Reset time to midnight
+    
+    $today = new DateTime();
+    $today->setTime(0, 0, 0); // Reset time to midnight
+    
+    if($today > $due_date) {
+        $overdue_count++;
+        // Calculate Fine
+        $days_late = $today->diff($due_date)->days;
+        $total_pending_fine += ($days_late * 2); // NRS 2 per day
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -16,6 +39,23 @@ $overdue_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Make links act like blocks and remove underlines */
+        .stats-grid a {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        /* Add hover effect to indicate clickability */
+        .stat-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border: 1px solid #ddd;
+        }
+    </style>
 </head>
 <body>
 <div class="admin-container">
@@ -27,14 +67,40 @@ $overdue_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
         </div>
 
         <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon" style="background: #3498db;"><i class="fas fa-book-reader"></i></div>
-                <div class="stat-info"><h3><?= $issued_count ?></h3><p>Books Issued</p></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon" style="background: #e74c3c;"><i class="fas fa-exclamation-circle"></i></div>
-                <div class="stat-info"><h3><?= $overdue_count ?></h3><p>Overdue Books</p></div>
-            </div>
+            <!-- Books Issued (Clickable) -->
+            <a href="issued_books.php">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #3498db;"><i class="fas fa-book-reader"></i></div>
+                    <div class="stat-info">
+                        <h3><?= $issued_count ?></h3>
+                        <p>Books Issued</p>
+                    </div>
+                </div>
+            </a>
+            
+            <!-- Overdue Books (Clickable) -->
+            <a href="issued_books.php">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #e74c3c;"><i class="fas fa-exclamation-circle"></i></div>
+                    <div class="stat-info">
+                        <h3><?= $overdue_count ?></h3>
+                        <p>Overdue Books</p>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Total Pending Fine (Clickable) -->
+            <a href="issued_books.php">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #f1c40f; color: #fff;">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>NRS <?= $total_pending_fine ?></h3>
+                        <p>Pending Fine</p>
+                    </div>
+                </div>
+            </a>
         </div>
 
         <div class="card">
@@ -43,15 +109,16 @@ $overdue_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Code</th> <!-- Added Column Header -->
+                            <th>Code</th>
                             <th>Book Title</th>
                             <th>Due Date</th>
                             <th>Status</th>
+                            <th>Fine</th>
                         </tr>
                     </thead>
                     <tbody>
                     <?php
-                    // JOIN book_copies to get unique_code
+                    // Fetch recent 5 books
                     $query = "SELECT b.title, ib.due_date, bc.unique_code 
                               FROM issued_books ib 
                               JOIN books b ON ib.book_id = b.id 
@@ -65,7 +132,17 @@ $overdue_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
                     if (mysqli_num_rows($result) > 0):
                         while ($r = mysqli_fetch_assoc($result)): 
-                            $is_overdue = strtotime($r['due_date']) < time();
+                            $due = new DateTime($r['due_date']);
+                            $due->setTime(0,0,0);
+                            
+                            $now = new DateTime();
+                            $now->setTime(0,0,0);
+                            
+                            $is_overdue = $now > $due;
+                            $fine = 0;
+                            if($is_overdue) {
+                                $fine = $now->diff($due)->days * 2;
+                            }
                     ?>
                         <tr>
                             <td>
@@ -80,9 +157,16 @@ $overdue_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                     <?= $is_overdue ? 'Overdue' : 'Active' ?>
                                 </span>
                             </td>
+                            <td>
+                                <?php if($fine > 0): ?>
+                                    <span style="color: #e74c3c; font-weight: bold;">NRS <?= $fine ?></span>
+                                <?php else: ?>
+                                    <span style="color: #2ecc71;">-</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                         <?php endwhile; else: ?>
-                        <tr><td colspan="4" class="text-center">No books issued.</td></tr>
+                        <tr><td colspan="5" class="text-center">No books issued.</td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>

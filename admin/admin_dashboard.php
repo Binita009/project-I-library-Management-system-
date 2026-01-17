@@ -77,7 +77,7 @@ $overdue_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 </a>
                 
                 <!-- Issued Now -->
-                <a href="return_book.php">
+                <a href="issue_book.php">
                     <div class="stat-card">
                         <div class="stat-icon" style="background: #4cc9f0;">
                             <i class="fas fa-book-reader"></i>
