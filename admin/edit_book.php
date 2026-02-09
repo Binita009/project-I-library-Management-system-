@@ -1,5 +1,6 @@
 <?php
 require_once '../config/db.php';
+require_once '../config/validation.php'; // Included validation for sanitation
 requireAdmin();
 
 if (empty($_GET['id'])) {
@@ -23,101 +24,138 @@ if (!$book) {
 
 /* Update book */
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-
-    $title  = trim($_POST['title']);
-    $author = trim($_POST['author']);
-    $isbn   = trim($_POST['isbn']);
-    $cat    = $_POST['category'];
+    $title  = Validation::sanitize($_POST['title']);
+    $author = Validation::sanitize($_POST['author']);
+    $isbn   = Validation::sanitize($_POST['isbn']);
+    $cat    = Validation::sanitize($_POST['category']);
     $total  = (int)$_POST['total_copies'];
 
-    $issued = $book['total_copies'] - $book['available_copies'];
-    $avail  = $total - $issued;
+    // Calculate available copies based on current issued count
+    $issued_count = $book['total_copies'] - $book['available_copies'];
+    $new_available = $total - $issued_count;
 
-    if ($avail < 0) {
-        $error = "Cannot reduce copies below issued books";
+    if ($new_available < 0) {
+        $error = "Cannot reduce total copies below the number currently issued ($issued_count).";
     } elseif ($title && $author && $isbn && $total > 0) {
-
-        /* Check ISBN */
-        $check = mysqli_prepare($conn,
-            "SELECT id FROM books WHERE isbn=? AND id!=?"
-        );
+        // Check ISBN uniqueness (exclude current book)
+        $check = mysqli_prepare($conn, "SELECT id FROM books WHERE isbn=? AND id!=?");
         mysqli_stmt_bind_param($check, "si", $isbn, $id);
         mysqli_stmt_execute($check);
         mysqli_stmt_store_result($check);
 
         if (mysqli_stmt_num_rows($check) > 0) {
-            $error = "ISBN already exists";
+            $error = "ISBN already exists for another book.";
         } else {
-            $update = mysqli_prepare($conn,
-                "UPDATE books SET title=?, author=?, isbn=?, category=?,
-                 total_copies=?, available_copies=? WHERE id=?"
+            $update = mysqli_prepare($conn, 
+                "UPDATE books SET title=?, author=?, isbn=?, category=?, total_copies=?, available_copies=? WHERE id=?"
             );
-            mysqli_stmt_bind_param($update, "ssssiii",
-                $title, $author, $isbn, $cat, $total, $avail, $id
-            );
+            mysqli_stmt_bind_param($update, "ssssiii", $title, $author, $isbn, $cat, $total, $new_available, $id);
 
             if (mysqli_stmt_execute($update)) {
-                $success = "Book updated successfully";
+                $success = "Book updated successfully!";
+                // Refresh data
                 $book['title'] = $title;
                 $book['author'] = $author;
                 $book['isbn'] = $isbn;
                 $book['category'] = $cat;
                 $book['total_copies'] = $total;
-                $book['available_copies'] = $avail;
+                $book['available_copies'] = $new_available;
             } else {
-                $error = "Update failed";
+                $error = "Update failed: " . mysqli_error($conn);
             }
         }
     } else {
-        $error = "Please fill all required fields";
+        $error = "Please fill all required fields correctly.";
     }
 }
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Edit Book</title>
+    <meta charset="UTF-8">
+    <title>Edit Book - Admin Panel</title>
+    <!-- FIX: Added missing CSS links -->
     <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+    <div class="admin-container">
+        <?php include '../includes/admin_sidebar.php'; ?>
 
-<div class="admin-container">
-<?php include '../includes/admin_sidebar.php'; ?>
+        <div class="main-content">
+            <div class="content-header">
+                <h1>Edit Book</h1>
+                <a href="manage_book.php" class="btn"><i class="fas fa-arrow-left"></i> Back to List</a>
+            </div>
 
-<div class="main-content">
-<h1>Edit Book</h1>
-<a href="manage_book.php" class="btn">← Back</a>
+            <div class="card">
+                <?php if ($error): ?>
+                    <div class="alert alert-error"><?= $error ?></div>
+                <?php endif; ?>
+                <?php if ($success): ?>
+                    <div class="alert alert-success"><?= $success ?></div>
+                <?php endif; ?>
 
-<?php if ($error): ?><p class="alert alert-error"><?= $error ?></p><?php endif; ?>
-<?php if ($success): ?><p class="alert alert-success"><?= $success ?></p><?php endif; ?>
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="title">Book Title *</label>
+                        <input type="text" name="title" id="title" class="form-control" 
+                               value="<?= htmlspecialchars($book['title']) ?>" required>
+                    </div>
 
-<form method="POST">
-    <input type="text" name="title" required value="<?= htmlspecialchars($book['title']) ?>">
-    <input type="text" name="author" required value="<?= htmlspecialchars($book['author']) ?>">
-    <input type="text" name="isbn" required value="<?= htmlspecialchars($book['isbn']) ?>">
+                    <div class="form-row" style="display: flex; gap: 20px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="author">Author *</label>
+                            <input type="text" name="author" id="author" class="form-control" 
+                                   value="<?= htmlspecialchars($book['author']) ?>" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="isbn">ISBN Number *</label>
+                            <input type="text" name="isbn" id="isbn" class="form-control" 
+                                   value="<?= htmlspecialchars($book['isbn']) ?>" required>
+                        </div>
+                    </div>
 
-<select name="category" class="form-control">
-    <?php
-    $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
-    while($c = mysqli_fetch_assoc($cat_query)):
-    ?>
-        <option value="<?= htmlspecialchars($c['name']) ?>" <?= ($book['category'] == $c['name']) ? 'selected' : '' ?>>
-            <?= htmlspecialchars($c['name']) ?>
-        </option>
-    <?php endwhile; ?>
-</select>
+                    <div class="form-row" style="display: flex; gap: 20px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="category">Category</label>
+                            <select name="category" id="category" class="form-control">
+                                <?php
+                                // FIX: Use dynamic categories from database
+                                $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
+                                if(mysqli_num_rows($cat_query) > 0) {
+                                    while($c = mysqli_fetch_assoc($cat_query)) {
+                                        $selected = ($book['category'] == $c['name']) ? 'selected' : '';
+                                        echo '<option value="'.htmlspecialchars($c['name']).'" '.$selected.'>'.htmlspecialchars($c['name']).'</option>';
+                                    }
+                                } else {
+                                    // Fallback if no categories in DB yet
+                                    echo '<option value="'.$book['category'].'" selected>'.$book['category'].'</option>';
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="total_copies">Total Copies *</label>
+                            <input type="number" name="total_copies" id="total_copies" min="1" class="form-control"
+                                   value="<?= $book['total_copies'] ?>" required>
+                        </div>
+                    </div>
 
-    <input type="number" name="total_copies" min="1"
-           value="<?= $book['total_copies'] ?>" required>
+                    <div class="form-group">
+                        <label>Current Status</label>
+                        <input type="text" class="form-control" style="background: #e9ecef;" 
+                               value="Available on Shelf: <?= $book['available_copies'] ?>" readonly>
+                    </div>
 
-    <input type="text" value="Available: <?= $book['available_copies'] ?>" readonly>
-
-    <button class="btn btn-primary">Update Book</button>
-    <a href="manage_book.php" class="btn">Cancel</a>
-</form>
-
-</div>
-</div>
-
+                    <div style="margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary">Update Book</button>
+                        <a href="manage_book.php" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

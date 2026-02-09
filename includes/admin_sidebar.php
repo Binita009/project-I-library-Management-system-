@@ -45,6 +45,10 @@ $path = (basename(dirname($_SERVER['PHP_SELF'])) == 'admin') ? '' : '../';
             <i class="fas fa-coins"></i>
             <span>Fines</span>
         </a>
+        <a href="browse_categories.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'browse_categories.php' ? 'active' : ''; ?>">
+    <i class="fas fa-th-large"></i>
+    <span>Categories Menu</span>
+    </a>
 
         <a href="reports.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>">
             <i class="fas fa-chart-bar"></i>

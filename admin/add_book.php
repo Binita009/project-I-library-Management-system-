@@ -6,6 +6,9 @@ requireAdmin();
 $error = '';
 $success = '';
 
+// Fetch Categories for Dropdown
+$cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $title    = Validation::sanitize($_POST['title']);
     $author   = Validation::sanitize($_POST['author']);
@@ -13,13 +16,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $category = Validation::sanitize($_POST['category']);
     $copies   = (int)$_POST['copies'];
 
-    if (empty($title) || empty($author) || empty($isbn) || $copies < 1) {
+    if (empty($title) || empty($author) || empty($isbn) || $copies < 1 || empty($category)) {
         $error = "Please fill all required fields correctly.";
     } else {
         // 1. Insert the main Book info
         mysqli_begin_transaction($conn);
         try {
-            // Check if ISBN exists to avoid duplicates in title info (Optional logic, handled by UNIQUE constraint usually)
+            // Check if ISBN exists
+            $check = mysqli_query($conn, "SELECT id FROM books WHERE isbn = '$isbn'");
+            if(mysqli_num_rows($check) > 0) {
+                throw new Exception("A book with this ISBN already exists.");
+            }
+
             $insert_book = "INSERT INTO books (title, author, isbn, category, total_copies, available_copies) 
                             VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = mysqli_prepare($conn, $insert_book);
@@ -35,7 +43,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             for ($i = 1; $i <= $copies; $i++) {
                 // Generate Code: ISBN + Random String + Sequence
-                // Example: 978123-A1B2-1
                 $random_str = strtoupper(substr(md5(time() . rand()), 0, 4));
                 $unique_code = $isbn . "-" . $random_str . "-" . $i;
                 
@@ -45,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             mysqli_commit($conn);
             $success = "Book added successfully! $copies unique codes generated.";
-            $_POST = array(); 
+            $_POST = array(); // Clear form
             
         } catch (Exception $e) {
             mysqli_rollback($conn);
@@ -54,8 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 ?>
-<!-- Keep the HTML Form exactly as it is in your original file -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -105,18 +110,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
 
                     <div class="form-row" style="display: flex; gap: 20px;">
+                        <!-- DYNAMIC CATEGORY SECTION -->
                         <div class="form-group" style="flex: 1;">
-                            <label for="category">Category</label>
-<select name="category" id="category" class="form-control" required>
-    <option value="">Select Category</option>
-    <?php
-    $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
-    while($c = mysqli_fetch_assoc($cat_query)) {
-        echo '<option value="'.htmlspecialchars($c['name']).'">'.htmlspecialchars($c['name']).'</option>';
-    }
-    ?>
-</select>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label for="category">Category *</label>
+                                <!-- Link to add category if it doesn't exist -->
+                                <a href="manage_categories.php" target="_blank" style="font-size: 12px; color: var(--primary); text-decoration: none;">
+                                    <i class="fas fa-plus-circle"></i> New Category
+                                </a>
+                            </div>
+                            
+                            <select name="category" id="category" class="form-control" required>
+                                <option value="">Select Category</option>
+                                <?php 
+                                // Reset pointer if query was used before
+                                mysqli_data_seek($cat_query, 0);
+                                while($c = mysqli_fetch_assoc($cat_query)): 
+                                ?>
+                                    <option value="<?= htmlspecialchars($c['name']) ?>" 
+                                        <?= (isset($_POST['category']) && $_POST['category'] == $c['name']) ? 'selected' : ''; ?>>
+                                        <?= htmlspecialchars($c['name']) ?>
+                                    </option>
+                                <?php endwhile; ?>
+                            </select>
                         </div>
+
                         <div class="form-group" style="flex: 1;">
                             <label for="copies">Total Copies *</label>
                             <input type="number" name="copies" id="copies" min="1" class="form-control" 

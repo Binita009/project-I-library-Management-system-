@@ -2,30 +2,98 @@
 require_once '../config/db.php';
 requireAdmin();
 
-// Calculate Total Collected Fine
-$total_sql = "SELECT SUM(fine_amount) as total FROM issued_books WHERE status='returned'";
-$total_res = mysqli_query($conn, $total_sql);
-$total_data = mysqli_fetch_assoc($total_res);
-$total_collected = $total_data['total'] ?? 0;
+// --- Configuration ---
+$fine_rate = 2; // NRS per day
 
-// Fetch Fine History
-$sql = "SELECT ib.*, b.title, u.full_name, u.username, bc.unique_code 
-        FROM issued_books ib 
-        JOIN books b ON ib.book_id = b.id 
-        JOIN users u ON ib.user_id = u.id 
-        LEFT JOIN book_copies bc ON ib.copy_id = bc.id
-        WHERE ib.status = 'returned' AND ib.fine_amount > 0
-        ORDER BY ib.return_date DESC";
-$result = mysqli_query($conn, $sql);
+// --- Handle View Toggle ---
+$active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'pending';
+
+// --- 1. Logic for PENDING Fines (Calculated on the fly) ---
+// Groups by Student to show Total Due
+$pending_sql = "SELECT 
+                    u.id as user_id, 
+                    u.full_name, 
+                    u.username, 
+                    u.phone, 
+                    COUNT(ib.id) as overdue_books,
+                    SUM(DATEDIFF(CURDATE(), ib.due_date) * $fine_rate) as total_due
+                FROM issued_books ib
+                JOIN users u ON ib.user_id = u.id
+                WHERE ib.status = 'issued' 
+                AND ib.due_date < CURDATE()
+                GROUP BY u.id
+                ORDER BY total_due DESC";
+$pending_res = mysqli_query($conn, $pending_sql);
+
+// Store in array to calculate total sum before display
+$pending_data = [];
+$total_pending_amount = 0;
+if ($pending_res) {
+    while($row = mysqli_fetch_assoc($pending_res)) {
+        $pending_data[] = $row;
+        $total_pending_amount += $row['total_due'];
+    }
+}
+
+// --- 2. Logic for COLLECTED Fines (History) ---
+$history_sql = "SELECT ib.*, b.title, u.full_name, u.username, bc.unique_code 
+                FROM issued_books ib 
+                JOIN books b ON ib.book_id = b.id 
+                JOIN users u ON ib.user_id = u.id 
+                LEFT JOIN book_copies bc ON ib.copy_id = bc.id
+                WHERE ib.status = 'returned' AND ib.fine_amount > 0
+                ORDER BY ib.return_date DESC";
+$history_res = mysqli_query($conn, $history_sql);
+
+$history_data = [];
+$total_collected_amount = 0;
+if ($history_res) {
+    while($row = mysqli_fetch_assoc($history_res)) {
+        $history_data[] = $row;
+        $total_collected_amount += $row['fine_amount'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Collected Fines</title>
+    <title>Fine Management</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .nav-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .nav-item {
+            padding: 12px 20px;
+            text-decoration: none;
+            color: #555;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+        }
+        .nav-item:hover {
+            color: var(--primary);
+            background: #f8f9fa;
+        }
+        .nav-item.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+        }
+        .stat-box {
+            padding: 20px; 
+            border-radius: 10px; 
+            color: white; 
+            display: flex; 
+            align-items: center; 
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+    </style>
 </head>
 <body>
     <div class="admin-container">
@@ -33,68 +101,125 @@ $result = mysqli_query($conn, $sql);
         
         <div class="main-content">
             <div class="content-header">
-                <h1>Fines Collected</h1>
+                <h1>Fine Management</h1>
             </div>
 
-            <!-- Total Card -->
-            <div class="stats-grid">
-                <div class="stat-card" style="border-left: 5px solid #f1c40f;">
-                    <div class="stat-icon" style="background: #f1c40f; color: white;">
-                        <i class="fas fa-coins"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3>NRS <?= number_format($total_collected, 2) ?></h3>
-                        <p>Total Revenue from Fines</p>
+            <!-- Tabs -->
+            <div class="nav-tabs">
+                <a href="?tab=pending" class="nav-item <?= $active_tab == 'pending' ? 'active' : '' ?>">
+                    <i class="fas fa-clock"></i> Unpaid / Due Fines
+                </a>
+                <a href="?tab=collected" class="nav-item <?= $active_tab == 'collected' ? 'active' : '' ?>">
+                    <i class="fas fa-check-circle"></i> Collected History
+                </a>
+            </div>
+
+            <?php if ($active_tab == 'pending'): ?>
+                <!-- PENDING VIEW -->
+                <div class="stat-box" style="background: #e74c3c;">
+                    <i class="fas fa-exclamation-circle" style="font-size: 30px;"></i>
+                    <div>
+                        <h2 style="margin:0;">NRS <?= number_format($total_pending_amount, 2) ?></h2>
+                        <span style="opacity: 0.9;">Total Outstanding Fines from Students</span>
                     </div>
                 </div>
-            </div>
-            
-            <div class="card">
-                <h3>Fine History</h3>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Returned Date</th>
-                                <th>Student</th>
-                                <th>Book Title</th>
-                                <th>Unique Code</th>
-                                <th>Fine Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if(mysqli_num_rows($result) > 0): ?>
-                                <?php while($row = mysqli_fetch_assoc($result)): ?>
+
+                <div class="card">
+                    <h3>Students with Due Fines</h3>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
                                 <tr>
-                                    <td><?= date('M d, Y', strtotime($row['return_date'])) ?></td>
-                                    <td>
-                                        <strong><?= htmlspecialchars($row['full_name']) ?></strong><br>
-                                        <small><?= htmlspecialchars($row['username']) ?></small>
-                                    </td>
-                                    <td><?= htmlspecialchars($row['title']) ?></td>
-                                    <td>
-                                        <span class="badge" style="background:#e9ecef; color:#333; font-family:monospace;">
-                                            <?= htmlspecialchars($row['unique_code'] ?? 'N/A') ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span style="color: #e74c3c; font-weight: bold;">
-                                            NRS <?= $row['fine_amount'] ?>
-                                        </span>
-                                    </td>
+                                    <th>Student Name</th>
+                                    <th>Contact</th>
+                                    <th>Overdue Books</th>
+                                    <th>Total Fine Due</th>
+                                    <th>Action</th>
                                 </tr>
-                                <?php endwhile; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="5" class="text-center" style="padding: 30px; color: #7f8c8d;">
-                                        No fines have been collected yet.
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <?php if(count($pending_data) > 0): ?>
+                                    <?php foreach($pending_data as $row): ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?= htmlspecialchars($row['full_name']) ?></strong><br>
+                                            <small><?= htmlspecialchars($row['username']) ?></small>
+                                        </td>
+                                        <td><?= htmlspecialchars($row['phone']) ?></td>
+                                        <td>
+                                            <span class="badge badge-danger"><?= $row['overdue_books'] ?> Books</span>
+                                        </td>
+                                        <td>
+                                            <span style="color: #e74c3c; font-weight: bold; font-size: 1.1em;">
+                                                NRS <?= $row['total_due'] ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="return_book.php" class="btn btn-primary btn-sm">
+                                                Go to Return & Collect
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr><td colspan="5" class="text-center">No pending fines! Everyone is on time.</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+
+            <?php else: ?>
+                <!-- COLLECTED VIEW -->
+                <div class="stat-box" style="background: #27ae60;">
+                    <i class="fas fa-wallet" style="font-size: 30px;"></i>
+                    <div>
+                        <h2 style="margin:0;">NRS <?= number_format($total_collected_amount, 2) ?></h2>
+                        <span style="opacity: 0.9;">Total Fines Collected so far</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Collection History</h3>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Returned Date</th>
+                                    <th>Student</th>
+                                    <th>Book</th>
+                                    <th>Fine Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if(count($history_data) > 0): ?>
+                                    <?php foreach($history_data as $row): ?>
+                                    <tr>
+                                        <td><?= date('M d, Y', strtotime($row['return_date'])) ?></td>
+                                        <td>
+                                            <strong><?= htmlspecialchars($row['full_name']) ?></strong><br>
+                                            <small><?= htmlspecialchars($row['username']) ?></small>
+                                        </td>
+                                        <td>
+                                            <?= htmlspecialchars($row['title']) ?><br>
+                                            <small style="color:#777;"><?= htmlspecialchars($row['unique_code'] ?? '') ?></small>
+                                        </td>
+                                        <td>
+                                            <span style="color: #27ae60; font-weight: bold;">
+                                                NRS <?= $row['fine_amount'] ?>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr><td colspan="4" class="text-center">No fines collected yet.</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            <?php endif; ?>
+
         </div>
     </div>
 </body>

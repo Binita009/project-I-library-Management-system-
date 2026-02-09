@@ -2,38 +2,29 @@
 require_once '../config/db.php';
 requireMember();
 
-// Force UTF-8 to prevent search encoding errors
 mysqli_set_charset($conn, "utf8");
 
-// 1. Capture Search Input
+// 1. Capture Inputs
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$debug_message = "";
+$category_filter = isset($_GET['category']) ? trim($_GET['category']) : '';
 
 // 2. Build Query
-$sql = "SELECT * FROM books";
+$sql = "SELECT * FROM books WHERE 1=1";
 
 if (!empty($search)) {
     $search_safe = mysqli_real_escape_string($conn, $search);
-    
-    // Using parentheses ( ) around OR conditions is safer practice
-    $sql .= " WHERE (title LIKE '%$search_safe%' 
+    $sql .= " AND (title LIKE '%$search_safe%' 
               OR author LIKE '%$search_safe%' 
-              OR category LIKE '%$search_safe%' 
               OR isbn LIKE '%$search_safe%')";
-              
-    // Debug feedback (optional, you can remove this later)
-    $debug_message = "Searching for: <strong>" . htmlspecialchars($search) . "</strong>";
+}
+
+if (!empty($category_filter)) {
+    $cat_safe = mysqli_real_escape_string($conn, $category_filter);
+    $sql .= " AND category = '$cat_safe'";
 }
 
 $sql .= " ORDER BY title ASC";
-
-// Execute
 $result = mysqli_query($conn, $sql);
-
-// Check for SQL syntax errors
-if (!$result) {
-    die("Database Query Error: " . mysqli_error($conn));
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -51,27 +42,32 @@ if (!$result) {
 
     <div class="main-content">
         <div class="content-header">
-            <h1>Browse Library Books</h1>
+            <h1>
+                <?php if($category_filter): ?>
+                    Category: <?= htmlspecialchars($category_filter) ?>
+                <?php else: ?>
+                    Browse Library Books
+                <?php endif; ?>
+            </h1>
         </div>
-
-        <!-- Debug Message Area -->
-        <?php if($debug_message): ?>
-            <div style="background: #e7f1ff; color: #0c5460; padding: 10px; margin-bottom: 20px; border: 1px solid #b8daff; border-radius: 5px;">
-                <i class="fas fa-info-circle"></i> <?= $debug_message ?>
-            </div>
-        <?php endif; ?>
 
         <!-- Search Bar Section -->
         <div class="card">
             <form method="GET" action="books.php" style="display: flex; gap: 10px;">
+                <!-- Keep category filter if searching within a category -->
+                <?php if($category_filter): ?>
+                    <input type="hidden" name="category" value="<?= htmlspecialchars($category_filter) ?>">
+                <?php endif; ?>
+
                 <input type="text" name="search" class="form-control" 
-                       placeholder="Search by Title, Author, ISBN..." 
-                       value="<?= htmlspecialchars($search) ?>" autocomplete="off">
+                       placeholder="Search books..." 
+                       value="<?= htmlspecialchars($search) ?>">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-search"></i> Search
                 </button>
-                <?php if(!empty($search)): ?>
-                    <a href="books.php" class="btn btn-danger">Clear</a>
+                
+                <?php if(!empty($search) || !empty($category_filter)): ?>
+                    <a href="books.php" class="btn btn-danger">Clear All</a>
                 <?php endif; ?>
             </form>
         </div>
@@ -82,7 +78,6 @@ if (!$result) {
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>ISBN</th>
                             <th>Title</th>
                             <th>Author</th>
                             <th>Category</th>
@@ -96,39 +91,27 @@ if (!$result) {
                             $is_available = $book['available_copies'] > 0;
                         ?>
                         <tr>
-                            <td style="font-family: monospace; color: #666;"><?= htmlspecialchars($book['isbn']) ?></td>
                             <td style="font-weight: bold; color: #2c3e50;">
                                 <?= htmlspecialchars($book['title']) ?>
                             </td>
                             <td><?= htmlspecialchars($book['author']) ?></td>
-                            <td><span class="badge-category"><?= htmlspecialchars($book['category']) ?></span></td>
+                            <td><span style="background: #ecf0f1; padding: 4px 8px; border-radius: 4px; font-size: 12px;"><?= htmlspecialchars($book['category']) ?></span></td>
                             <td>
                                 <?php if ($is_available): ?>
-                                    <span class="status-badge available">
-                                        Available (<?= $book['available_copies'] ?>)
-                                    </span>
+                                    <span style="color: green; font-weight: 500;">Available (<?= $book['available_copies'] ?>)</span>
                                 <?php else: ?>
-                                    <span class="status-badge out-of-stock">
-                                        Out of Stock
-                                    </span>
+                                    <span style="color: red; font-weight: 500;">Out of Stock</span>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <a href="view_book.php?id=<?= $book['id'] ?>" class="btn btn-primary btn-sm">
-                                    View
-                                </a>
+                                <a href="view_book.php?id=<?= $book['id'] ?>" class="btn btn-primary btn-sm">View</a>
                             </td>
                         </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="6" style="text-align: center; padding: 40px; color: #7f8c8d;">
-                                <i class="fas fa-book-open" style="font-size: 32px; margin-bottom: 15px; display:block; opacity: 0.5;"></i>
-                                <?php if($search): ?>
-                                    No results found for "<strong><?= htmlspecialchars($search) ?></strong>"
-                                <?php else: ?>
-                                    No books available in the library yet.
-                                <?php endif; ?>
+                            <td colspan="5" style="text-align: center; padding: 40px; color: #7f8c8d;">
+                                No books found.
                             </td>
                         </tr>
                     <?php endif; ?>
@@ -138,15 +121,5 @@ if (!$result) {
         </div>
     </div>
 </div>
-
-<style>
-    .badge-category {
-        background: #ecf0f1; color: #2c3e50; padding: 4px 8px; border-radius: 4px; font-size: 12px; border: 1px solid #bdc3c7;
-    }
-    .status-badge { padding: 5px 10px; border-radius: 15px; font-size: 13px; font-weight: 500; }
-    .status-badge.available { background-color: #d4edda; color: #155724; }
-    .status-badge.out-of-stock { background-color: #f8d7da; color: #721c24; }
-</style>
-
 </body>
 </html>
