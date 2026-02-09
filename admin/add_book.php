@@ -107,13 +107,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <div class="form-row" style="display: flex; gap: 20px;">
                         <div class="form-group" style="flex: 1;">
                             <label for="category">Category</label>
-                            <select name="category" id="category" class="form-control">
-                                <option value="Computer Science">Computer Science</option>
-                                <option value="Mathematics">Mathematics</option>
-                                <option value="Physics">Physics</option>
-                                <option value="Fiction">Fiction</option>
-                                <option value="Other">Other</option>
-                            </select>
+<select name="category" id="category" class="form-control" required>
+    <option value="">Select Category</option>
+    <?php
+    $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
+    while($c = mysqli_fetch_assoc($cat_query)) {
+        echo '<option value="'.htmlspecialchars($c['name']).'">'.htmlspecialchars($c['name']).'</option>';
+    }
+    ?>
+</select>
                         </div>
                         <div class="form-group" style="flex: 1;">
                             <label for="copies">Total Copies *</label>

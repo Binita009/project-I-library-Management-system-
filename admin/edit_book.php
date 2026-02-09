@@ -96,15 +96,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <input type="text" name="author" required value="<?= htmlspecialchars($book['author']) ?>">
     <input type="text" name="isbn" required value="<?= htmlspecialchars($book['isbn']) ?>">
 
-    <select name="category">
-        <?php
-        $cats = ["Computer Science","Mathematics","Physics","Chemistry",
-                 "Biology","Fiction","Non-Fiction","Other"];
-        foreach ($cats as $c):
-        ?>
-            <option <?= $book['category']==$c?'selected':'' ?>><?= $c ?></option>
-        <?php endforeach; ?>
-    </select>
+<select name="category" class="form-control">
+    <?php
+    $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
+    while($c = mysqli_fetch_assoc($cat_query)):
+    ?>
+        <option value="<?= htmlspecialchars($c['name']) ?>" <?= ($book['category'] == $c['name']) ? 'selected' : '' ?>>
+            <?= htmlspecialchars($c['name']) ?>
+        </option>
+    <?php endwhile; ?>
+</select>
 
     <input type="number" name="total_copies" min="1"
            value="<?= $book['total_copies'] ?>" required>
