@@ -1,49 +1,28 @@
 <?php
-// config/db.php
-
-// Only start session if one isn't already active
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/functions.php';
 
 $conn = mysqli_connect("localhost", "root", "", "library_db");
 
 if (!$conn) {
-    die("Database connection failed: " . mysqli_connect_error());
+    // Hide error from user for security
+    error_log("Connection failed: " . mysqli_connect_error()); 
+    die("System currently unavailable.");
 }
 
-/* Auth Helpers */
-function isLoggedIn() {
-    return !empty($_SESSION['user_id']);
-}
+function isLoggedIn() { return !empty($_SESSION['user_id']); }
+function isAdmin() { return isset($_SESSION['role']) && $_SESSION['role'] === 'admin'; }
+function isMember() { return isset($_SESSION['role']) && $_SESSION['role'] === 'member'; }
 
-function isAdmin() {
-    return isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
-}
-
-function isMember() {
-    return isset($_SESSION['role']) && $_SESSION['role'] === 'member';
-}
-
-function requireLogin() {
-    if (!isLoggedIn()) {
+function requireAdmin() {
+    if (!isAdmin()) {
         header("Location: ../auth/login.php");
         exit();
     }
 }
-
-function requireAdmin() {
-    requireLogin();
-    if (!isAdmin()) {
-        header("Location: ../member/dashboard.php");
-        exit();
-    }
-}
-
 function requireMember() {
-    requireLogin();
     if (!isMember()) {
-        header("Location: ../admin/admin_dashboard.php"); // Fixed redirect
+        header("Location: ../auth/login.php");
         exit();
     }
 }

@@ -1,45 +1,35 @@
 <?php
-// auth/login.php
 require_once '../config/db.php';
-require_once '../config/validation.php';
-
-$error = '';
 
 if($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = Validation::sanitize($_POST['username']);
-    $password = $_POST['password']; // Don't sanitize password before verification
+    verify_csrf(); // Check Token
+
+    $username = $_POST['username'];
+    $password = $_POST['password'];
     $role = $_POST['role'];
     
-    // Check user in DB
-    $sql = "SELECT id, username, password, role, full_name FROM users WHERE username = ? AND role = ?";
-    $stmt = mysqli_prepare($conn, $sql);
+    $stmt = mysqli_prepare($conn, "SELECT id, password, role, full_name FROM users WHERE username = ? AND role = ?");
     mysqli_stmt_bind_param($stmt, "ss", $username, $role);
     mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
+    $res = mysqli_stmt_get_result($stmt);
     
-    if($row = mysqli_fetch_assoc($result)) {
-        // Verify Password (supports both hashed and legacy plain text from SQL dump)
-        if(password_verify($password, $row['password']) || $password === $row['password']) {
+    if($row = mysqli_fetch_assoc($res)) {
+        if(password_verify($password, $row['password'])) {
+            session_regenerate_id(true); // Security
             $_SESSION["user_id"] = $row['id'];
-            $_SESSION["username"] = $row['username'];
             $_SESSION["role"] = $row['role'];
             $_SESSION["full_name"] = $row['full_name'];
             
-            if($role == 'admin') {
-                header("Location: ../admin/admin_dashboard.php");
-            } else {
-                header("Location: ../member/dashboard.php");
-            }
+            setAlert('success', 'Login Successful', 'Welcome back!');
+            
+            if($role == 'admin') header("Location: ../admin/admin_dashboard.php");
+            else header("Location: ../member/dashboard.php");
             exit;
-        } else {
-            $error = "Invalid password.";
         }
-    } else {
-        $error = "User not found or incorrect role.";
     }
+    setAlert('error', 'Login Failed', 'Invalid credentials.');
 }
 ?>
-<!-- HTML section remains largely the same, just ensure form action is correct -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,10 +40,10 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
 <body>
     <div class="auth-container">
         <div class="auth-box">
-            <div class="auth-header"><h2>Login</h2></div>
-            <?php if($error): ?><div class="alert alert-error"><?= $error ?></div><?php endif; ?>
-            
+            <h2>Login</h2>
             <form class="auth-form" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                
                 <div class="form-group">
                     <label>Username</label>
                     <input type="text" name="username" class="form-control" required>
@@ -63,18 +53,19 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="password" name="password" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label>Login As</label>
+                    <label>Role</label>
                     <select name="role" class="form-control">
                         <option value="member">Student</option>
-                        <option value="admin">Librarian (Admin)</option>
+                        <option value="admin">Admin</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary">Login</button>
-                <div class="auth-footer">
-                    <a href="register.php">Create Account</a>
-
+                <button class="btn btn-primary" style="width: 100%;">Login</button>
             </form>
+            <div style="text-align: center; margin-top: 15px;">
+                <a href="register.php">Create Account</a>
+            </div>
         </div>
     </div>
+    <?php include '../includes/footer.php'; ?>
 </body>
 </html>
