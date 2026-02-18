@@ -5,31 +5,26 @@ requireAdmin();
 $search = $_GET['search'] ?? '';
 $category_filter = $_GET['category'] ?? '';
 
-// Build Query
 $sql = "SELECT * FROM books WHERE 1=1";
 
 if($search) {
     $search = mysqli_real_escape_string($conn, $search);
     $sql .= " AND (title LIKE '%$search%' OR author LIKE '%$search%' OR isbn LIKE '%$search%')";
 }
-
 if($category_filter) {
     $cat_safe = mysqli_real_escape_string($conn, $category_filter);
     $sql .= " AND category = '$cat_safe'";
 }
-
 $sql .= " ORDER BY id DESC";
 $books = mysqli_query($conn, $sql);
-
-// Fetch categories for the filter dropdown
 $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <title>Manage Books</title>
+    <!-- Link to Master CSS -->
     <link rel="stylesheet" href="../assets/css/style.css">
-    <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
@@ -43,12 +38,10 @@ $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC"
             </div>
             
             <div class="card">
-                <!-- Search & Filter Bar -->
-                <form method="GET" style="margin-bottom: 25px; display: flex; gap: 10px; flex-wrap: wrap;">
-                    <input type="text" name="search" class="form-control" style="flex: 2; min-width: 200px;" 
-                           placeholder="Search by title, author, or ISBN..." value="<?= htmlspecialchars($search) ?>">
-                    
-                    <select name="category" class="form-control" style="flex: 1; min-width: 150px;">
+                <!-- Search -->
+                <form method="GET" style="margin-bottom: 25px; display: flex; gap: 10px;">
+                    <input type="text" name="search" class="form-control" placeholder="Search..." value="<?= htmlspecialchars($search) ?>">
+                    <select name="category" class="form-control" style="width: 200px;">
                         <option value="">All Categories</option>
                         <?php while($c = mysqli_fetch_assoc($cat_query)): ?>
                             <option value="<?= htmlspecialchars($c['name']) ?>" <?= ($category_filter == $c['name']) ? 'selected' : '' ?>>
@@ -56,59 +49,55 @@ $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC"
                             </option>
                         <?php endwhile; ?>
                     </select>
-
                     <button class="btn btn-primary">Filter</button>
-                    
                     <?php if($search || $category_filter): ?>
-                        <a href="manage_book.php" class="btn" style="background: #e9ecef;">Clear</a>
+                        <a href="manage_book.php" class="btn btn-secondary">Clear</a>
                     <?php endif; ?>
                 </form>
 
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Cover</th>
+                            <th>ISBN</th>
+                            <th>Title</th>
+                            <th>Stock</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if(mysqli_num_rows($books) > 0): ?>
+                            <?php while($row = mysqli_fetch_assoc($books)): 
+                                $img = getBookCover($row['cover_image']);
+                            ?>
                             <tr>
-                                <th>ISBN</th>
-                                <th>Title</th>
-                                <th>Author</th>
-                                <th>Category</th>
-                                <th>Stock</th>
-                                <th>Actions</th>
+                                <td><img src="<?= $img ?>" style="width: 40px; height: 50px; object-fit: cover; border-radius: 4px;"></td>
+                                <td style="font-family: monospace; color: #666;"><?= $row['isbn'] ?></td>
+                                <td>
+                                    <strong><?= htmlspecialchars($row['title']) ?></strong><br>
+                                    <small><?= htmlspecialchars($row['author']) ?></small>
+                                </td>
+                                <td>
+                                    <?php if($row['available_copies'] > 0): ?>
+                                        <span class="stock-badge in-stock"><?= $row['available_copies'] ?> Available</span>
+                                    <?php else: ?>
+                                        <span class="stock-badge out-stock">Out of Stock</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <a href="edit_book.php?id=<?= $row['id'] ?>" class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;"><i class="fas fa-edit"></i></a>
+                                    <a href="delete_book.php?id=<?= $row['id'] ?>" class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="return confirm('Delete this book?');"><i class="fas fa-trash"></i></a>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <?php if(mysqli_num_rows($books) > 0): ?>
-                                <?php while($row = mysqli_fetch_assoc($books)): 
-                                    $stock_percent = ($row['total_copies'] > 0) ? ($row['available_copies'] / $row['total_copies']) * 100 : 0;
-                                    $stock_color = $stock_percent < 20 ? '#f72585' : '#4cc9f0';
-                                ?>
-                                <tr>
-                                    <td style="color: #7f8c8d; font-family: monospace;"><?= $row['isbn'] ?></td>
-                                    <td style="font-weight: 600;"><?= $row['title'] ?></td>
-                                    <td><?= $row['author'] ?></td>
-                                    <td><span class="badge" style="background: #f1f3f5; color: #495057;"><?= $row['category'] ?></span></td>
-                                    <td>
-                                        <div style="display: flex; align-items: center; gap: 10px;">
-                                            <span style="font-weight: bold; color: <?= $stock_color ?>"><?= $row['available_copies'] ?></span>
-                                            <div style="width: 50px; height: 4px; background: #eee; border-radius: 2px;">
-                                                <div style="width: <?= $stock_percent ?>%; height: 100%; background: <?= $stock_color ?>; border-radius: 2px;"></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <a href="edit_book.php?id=<?= $row['id'] ?>" style="color: var(--primary); margin-right: 10px;"><i class="fas fa-edit"></i></a>
-                                        <a href="delete_book.php?id=<?= $row['id'] ?>" style="color: var(--danger);" onclick="return confirm('Delete this book?');"><i class="fas fa-trash"></i></a>
-                                    </td>
-                                </tr>
-                                <?php endwhile; ?>
-                            <?php else: ?>
-                                <tr><td colspan="6" class="text-center">No books found in this category.</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr><td colspan="5" style="text-align: center; padding: 20px;">No books found.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+    <?php include '../includes/footer.php'; ?>
 </body>
 </html>

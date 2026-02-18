@@ -2,14 +2,12 @@
 require_once '../config/db.php';
 requireAdmin();
 
-// --- Configuration ---
 $fine_rate = 2; // NRS per day
 
-// --- Handle View Toggle ---
+// Handle View Toggle
 $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'pending';
 
-// --- 1. Logic for PENDING Fines (Calculated on the fly) ---
-// Groups by Student to show Total Due
+// 1. PENDING Fines
 $pending_sql = "SELECT 
                     u.id as user_id, 
                     u.full_name, 
@@ -25,7 +23,6 @@ $pending_sql = "SELECT
                 ORDER BY total_due DESC";
 $pending_res = mysqli_query($conn, $pending_sql);
 
-// Store in array to calculate total sum before display
 $pending_data = [];
 $total_pending_amount = 0;
 if ($pending_res) {
@@ -35,7 +32,7 @@ if ($pending_res) {
     }
 }
 
-// --- 2. Logic for COLLECTED Fines (History) ---
+// 2. COLLECTED Fines
 $history_sql = "SELECT ib.*, b.title, u.full_name, u.username, bc.unique_code 
                 FROM issued_books ib 
                 JOIN books b ON ib.book_id = b.id 
@@ -57,42 +54,17 @@ if ($history_res) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
     <title>Fine Management</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        .nav-tabs {
-            display: flex;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ddd;
-        }
-        .nav-item {
-            padding: 12px 20px;
-            text-decoration: none;
-            color: #555;
-            font-weight: 600;
-            border-bottom: 3px solid transparent;
-            cursor: pointer;
-        }
-        .nav-item:hover {
-            color: var(--primary);
-            background: #f8f9fa;
-        }
-        .nav-item.active {
-            color: var(--primary);
-            border-bottom: 3px solid var(--primary);
-        }
-        .stat-box {
-            padding: 20px; 
-            border-radius: 10px; 
-            color: white; 
-            display: flex; 
-            align-items: center; 
-            gap: 15px;
-            margin-bottom: 20px;
-        }
+        .nav-tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
+        .nav-item { padding: 12px 20px; text-decoration: none; color: #555; font-weight: 600; border-bottom: 3px solid transparent; cursor: pointer; }
+        .nav-item:hover { color: var(--primary); background: #f8f9fa; }
+        .nav-item.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+        .stat-box { padding: 20px; border-radius: 10px; color: white; display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .nrs-symbol { font-size: 0.8em; opacity: 0.9; margin-right: 2px; }
     </style>
 </head>
 <body>
@@ -104,7 +76,6 @@ if ($history_res) {
                 <h1>Fine Management</h1>
             </div>
 
-            <!-- Tabs -->
             <div class="nav-tabs">
                 <a href="?tab=pending" class="nav-item <?= $active_tab == 'pending' ? 'active' : '' ?>">
                     <i class="fas fa-clock"></i> Unpaid / Due Fines
@@ -119,8 +90,8 @@ if ($history_res) {
                 <div class="stat-box" style="background: #e74c3c;">
                     <i class="fas fa-exclamation-circle" style="font-size: 30px;"></i>
                     <div>
-                        <h2 style="margin:0;">NRS <?= number_format($total_pending_amount, 2) ?></h2>
-                        <span style="opacity: 0.9;">Total Outstanding Fines from Students</span>
+                        <h2 style="margin:0;"><span class="nrs-symbol">NRS.</span> <?= number_format($total_pending_amount, 2) ?></h2>
+                        <span style="opacity: 0.9;">Total Outstanding Fines</span>
                     </div>
                 </div>
 
@@ -146,23 +117,19 @@ if ($history_res) {
                                             <small><?= htmlspecialchars($row['username']) ?></small>
                                         </td>
                                         <td><?= htmlspecialchars($row['phone']) ?></td>
-                                        <td>
-                                            <span class="badge badge-danger"><?= $row['overdue_books'] ?> Books</span>
-                                        </td>
+                                        <td><span class="badge badge-danger"><?= $row['overdue_books'] ?> Books</span></td>
                                         <td>
                                             <span style="color: #e74c3c; font-weight: bold; font-size: 1.1em;">
-                                                NRS <?= $row['total_due'] ?>
+                                                <small>NRS.</small> <?= number_format($row['total_due'], 2) ?>
                                             </span>
                                         </td>
                                         <td>
-                                            <a href="return_book.php" class="btn btn-primary btn-sm">
-                                                Go to Return & Collect
-                                            </a>
+                                            <a href="return_book.php" class="btn btn-primary btn-sm">Collect</a>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
                                 <?php else: ?>
-                                    <tr><td colspan="5" class="text-center">No pending fines! Everyone is on time.</td></tr>
+                                    <tr><td colspan="5" class="text-center">No pending fines!</td></tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
@@ -174,8 +141,8 @@ if ($history_res) {
                 <div class="stat-box" style="background: #27ae60;">
                     <i class="fas fa-wallet" style="font-size: 30px;"></i>
                     <div>
-                        <h2 style="margin:0;">NRS <?= number_format($total_collected_amount, 2) ?></h2>
-                        <span style="opacity: 0.9;">Total Fines Collected so far</span>
+                        <h2 style="margin:0;"><span class="nrs-symbol">NRS.</span> <?= number_format($total_collected_amount, 2) ?></h2>
+                        <span style="opacity: 0.9;">Total Fines Collected</span>
                     </div>
                 </div>
 
@@ -188,7 +155,7 @@ if ($history_res) {
                                     <th>Returned Date</th>
                                     <th>Student</th>
                                     <th>Book</th>
-                                    <th>Fine Amount</th>
+                                    <th>Amount</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -200,27 +167,24 @@ if ($history_res) {
                                             <strong><?= htmlspecialchars($row['full_name']) ?></strong><br>
                                             <small><?= htmlspecialchars($row['username']) ?></small>
                                         </td>
-                                        <td>
-                                            <?= htmlspecialchars($row['title']) ?><br>
-                                            <small style="color:#777;"><?= htmlspecialchars($row['unique_code'] ?? '') ?></small>
-                                        </td>
+                                        <td><?= htmlspecialchars($row['title']) ?></td>
                                         <td>
                                             <span style="color: #27ae60; font-weight: bold;">
-                                                NRS <?= $row['fine_amount'] ?>
+                                                <small>NRS.</small> <?= number_format($row['fine_amount'], 2) ?>
                                             </span>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
                                 <?php else: ?>
-                                    <tr><td colspan="4" class="text-center">No fines collected yet.</td></tr>
+                                    <tr><td colspan="4" class="text-center">No history yet.</td></tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
                 </div>
             <?php endif; ?>
-
         </div>
     </div>
+    <?php include '../includes/footer.php'; ?>
 </body>
 </html>

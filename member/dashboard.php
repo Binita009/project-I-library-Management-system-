@@ -10,23 +10,19 @@ $issued_count = 0;
 $overdue_count = 0;
 $total_pending_fine = 0;
 
-// Fetch all issued books to calculate stats
+// Calculate stats
 $sql_stats = "SELECT due_date FROM issued_books WHERE user_id = $user_id AND status = 'issued'";
 $result_stats = mysqli_query($conn, $sql_stats);
 
 while($row = mysqli_fetch_assoc($result_stats)) {
     $issued_count++;
-    
-    // Date Logic
     $due_date = new DateTime($row['due_date']);
-    $due_date->setTime(0, 0, 0); // Reset time to midnight
-    
+    $due_date->setTime(0, 0, 0);
     $today = new DateTime();
-    $today->setTime(0, 0, 0); // Reset time to midnight
+    $today->setTime(0, 0, 0);
     
     if($today > $due_date) {
         $overdue_count++;
-        // Calculate Fine
         $days_late = $today->diff($due_date)->days;
         $total_pending_fine += ($days_late * 2); // NRS 2 per day
     }
@@ -40,21 +36,9 @@ while($row = mysqli_fetch_assoc($result_stats)) {
     <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* Make links act like blocks and remove underlines */
-        .stats-grid a {
-            text-decoration: none;
-            color: inherit;
-            display: block;
-        }
-        /* Add hover effect to indicate clickability */
-        .stat-card {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-            border: 1px solid #ddd;
-        }
+        .stats-grid a { text-decoration: none; color: inherit; display: block; }
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); border: 1px solid #ddd; }
     </style>
 </head>
 <body>
@@ -67,7 +51,6 @@ while($row = mysqli_fetch_assoc($result_stats)) {
         </div>
 
         <div class="stats-grid">
-            <!-- Books Issued (Clickable) -->
             <a href="issued_books.php">
                 <div class="stat-card">
                     <div class="stat-icon" style="background: #3498db;"><i class="fas fa-book-reader"></i></div>
@@ -78,7 +61,6 @@ while($row = mysqli_fetch_assoc($result_stats)) {
                 </div>
             </a>
             
-            <!-- Overdue Books (Clickable) -->
             <a href="issued_books.php">
                 <div class="stat-card">
                     <div class="stat-icon" style="background: #e74c3c;"><i class="fas fa-exclamation-circle"></i></div>
@@ -89,14 +71,13 @@ while($row = mysqli_fetch_assoc($result_stats)) {
                 </div>
             </a>
 
-            <!-- Total Pending Fine (Clickable) -->
             <a href="issued_books.php">
                 <div class="stat-card">
                     <div class="stat-icon" style="background: #f1c40f; color: #fff;">
                         <i class="fas fa-coins"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>NRS <?= $total_pending_fine ?></h3>
+                        <h3><small style="font-size: 14px;">NRS.</small> <?= number_format($total_pending_fine, 2) ?></h3>
                         <p>Pending Fine</p>
                     </div>
                 </div>
@@ -118,7 +99,6 @@ while($row = mysqli_fetch_assoc($result_stats)) {
                     </thead>
                     <tbody>
                     <?php
-                    // Fetch recent 5 books
                     $query = "SELECT b.title, ib.due_date, bc.unique_code 
                               FROM issued_books ib 
                               JOIN books b ON ib.book_id = b.id 
@@ -134,22 +114,13 @@ while($row = mysqli_fetch_assoc($result_stats)) {
                         while ($r = mysqli_fetch_assoc($result)): 
                             $due = new DateTime($r['due_date']);
                             $due->setTime(0,0,0);
-                            
                             $now = new DateTime();
                             $now->setTime(0,0,0);
-                            
                             $is_overdue = $now > $due;
-                            $fine = 0;
-                            if($is_overdue) {
-                                $fine = $now->diff($due)->days * 2;
-                            }
+                            $fine = $is_overdue ? ($now->diff($due)->days * 2) : 0;
                     ?>
                         <tr>
-                            <td>
-                                <span style="background: #f1f3f5; padding: 3px 6px; border-radius: 4px; font-family: monospace; font-size: 12px; font-weight: bold;">
-                                    <?= $r['unique_code'] ? htmlspecialchars($r['unique_code']) : 'N/A' ?>
-                                </span>
-                            </td>
+                            <td><span style="background: #f1f3f5; padding: 3px 6px; border-radius: 4px; font-family: monospace; font-size: 12px;"><?= $r['unique_code'] ?? 'N/A' ?></span></td>
                             <td style="font-weight: 600;"><?= htmlspecialchars($r['title']) ?></td>
                             <td><?= date('M d, Y', strtotime($r['due_date'])) ?></td>
                             <td>
@@ -159,7 +130,7 @@ while($row = mysqli_fetch_assoc($result_stats)) {
                             </td>
                             <td>
                                 <?php if($fine > 0): ?>
-                                    <span style="color: #e74c3c; font-weight: bold;">NRS <?= $fine ?></span>
+                                    <span style="color: #e74c3c; font-weight: bold;"><small>NRS.</small> <?= $fine ?></span>
                                 <?php else: ?>
                                     <span style="color: #2ecc71;">-</span>
                                 <?php endif; ?>
@@ -174,5 +145,6 @@ while($row = mysqli_fetch_assoc($result_stats)) {
         </div>
     </div>
 </div>
+<?php include '../includes/footer.php'; ?>
 </body>
 </html>

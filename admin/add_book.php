@@ -2,6 +2,7 @@
 require_once '../config/db.php';
 requireAdmin();
 
+// Fetch Categories for Dropdown
 $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -10,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $title    = $_POST['title'];
     $author   = $_POST['author'];
     $isbn     = $_POST['isbn'];
-    $category = $_POST['category'];
+    $category = $_POST['category']; // Selected from dropdown
     $copies   = (int)$_POST['copies'];
     
     // Image Upload Logic
@@ -84,29 +85,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <div class="form-row" style="display: flex; gap: 20px;">
                         <div class="form-group" style="flex:1">
                             <label>Author</label>
-                            <!-- Regex: Letters, spaces, dots (for initials like J.K.) -->
-                            <input type="text" name="author" class="form-control" 
-                                   pattern="[a-zA-Z\s\.]+" 
-                                   title="Author name should only contain letters, spaces, and dots."
-                                   required>
+                            <input type="text" name="author" class="form-control" required>
                         </div>
                         <div class="form-group" style="flex:1">
                             <label>ISBN</label>
-                            <!-- Regex: Numbers and Hyphens only, 10-17 chars -->
-                            <input type="text" name="isbn" class="form-control" 
-                                   pattern="[0-9\-]{10,17}" 
-                                   title="ISBN should contain 10-13 digits (hyphens allowed)."
-                                   required>
+                            <input type="text" name="isbn" class="form-control" required>
                         </div>
                     </div>
 
                     <div class="form-row" style="display: flex; gap: 20px;">
                         <div class="form-group" style="flex:1">
                             <label>Category</label>
+                            <!-- DYNAMIC CATEGORY DROPDOWN -->
                             <select name="category" class="form-control" required>
                                 <option value="">Select Category</option>
-                                <?php while($c = mysqli_fetch_assoc($cat_query)): ?>
-                                    <option value="<?= $c['name'] ?>"><?= $c['name'] ?></option>
+                                <?php 
+                                // Reset pointer just in case
+                                mysqli_data_seek($cat_query, 0);
+                                while($c = mysqli_fetch_assoc($cat_query)): 
+                                ?>
+                                    <option value="<?= htmlspecialchars($c['name']) ?>">
+                                        <?= htmlspecialchars($c['name']) ?>
+                                    </option>
                                 <?php endwhile; ?>
                             </select>
                         </div>
