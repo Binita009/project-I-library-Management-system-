@@ -1,11 +1,13 @@
 <div class="sidebar">
     <div class="sidebar-header">
-        <h3><i class="fas fa-book"></i> LMS Admin</h3>
+        <h3><i class="fas fa-book-reader"></i> LMS Admin</h3>
     </div>
     
     <div class="user-info">
         <div class="user-details">
-            <h4 style="margin:0; font-size:16px;"><?php echo htmlspecialchars($_SESSION['full_name'] ?? 'Admin'); ?></h4>
+            <h4 style="margin:0; font-size:16px; color: white;">
+                <?php echo htmlspecialchars($_SESSION['full_name'] ?? 'Admin'); ?>
+            </h4>
             <span style="font-size:12px; color:#bdc3c7;">Librarian</span>
         </div>
     </div>
@@ -36,7 +38,6 @@
             <i class="fas fa-chart-line"></i> <span>Reports</span>
         </a>
         
-        <!-- Logout at bottom -->
         <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
             <a href="../auth/logout.php" class="menu-item" style="color: #e74c3c;">
                 <i class="fas fa-sign-out-alt"></i> <span>Logout</span>

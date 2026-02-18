@@ -6,14 +6,16 @@ requireAdmin();
 <html lang="en">
 <head>
     <title>Manage Students</title>
-    <!-- Link to Master CSS -->
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <!-- v=3.0 forces the browser to reload the CSS -->
+    <link rel="stylesheet" href="../assets/css/style.css?v=3.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <div class="admin-container">
+        <!-- 1. Sidebar -->
         <?php include '../includes/admin_sidebar.php'; ?>
         
+        <!-- 2. Main Content -->
         <div class="main-content">
             <div class="content-header">
                 <h1>Manage Students</h1>
