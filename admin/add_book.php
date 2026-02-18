@@ -5,7 +5,7 @@ requireAdmin();
 $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    verify_csrf(); // Security Check
+    verify_csrf();
 
     $title    = $_POST['title'];
     $author   = $_POST['author'];
@@ -26,7 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
 
-    // Database Insert
     mysqli_begin_transaction($conn);
     try {
         $check = mysqli_query($conn, "SELECT id FROM books WHERE isbn = '$isbn'");
@@ -85,18 +84,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <div class="form-row" style="display: flex; gap: 20px;">
                         <div class="form-group" style="flex:1">
                             <label>Author</label>
-                            <input type="text" name="author" class="form-control" required>
+                            <!-- Regex: Letters, spaces, dots (for initials like J.K.) -->
+                            <input type="text" name="author" class="form-control" 
+                                   pattern="[a-zA-Z\s\.]+" 
+                                   title="Author name should only contain letters, spaces, and dots."
+                                   required>
                         </div>
                         <div class="form-group" style="flex:1">
                             <label>ISBN</label>
-                            <input type="text" name="isbn" class="form-control" required>
+                            <!-- Regex: Numbers and Hyphens only, 10-17 chars -->
+                            <input type="text" name="isbn" class="form-control" 
+                                   pattern="[0-9\-]{10,17}" 
+                                   title="ISBN should contain 10-13 digits (hyphens allowed)."
+                                   required>
                         </div>
                     </div>
 
                     <div class="form-row" style="display: flex; gap: 20px;">
                         <div class="form-group" style="flex:1">
                             <label>Category</label>
-                            <select name="category" class="form-control">
+                            <select name="category" class="form-control" required>
+                                <option value="">Select Category</option>
                                 <?php while($c = mysqli_fetch_assoc($cat_query)): ?>
                                     <option value="<?= $c['name'] ?>"><?= $c['name'] ?></option>
                                 <?php endwhile; ?>
@@ -104,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </div>
                         <div class="form-group" style="flex:1">
                             <label>Copies</label>
-                            <input type="number" name="copies" class="form-control" value="1" min="1">
+                            <input type="number" name="copies" class="form-control" value="1" min="1" required>
                         </div>
                     </div>
 

@@ -2,7 +2,7 @@
 require_once '../config/db.php';
 
 if($_SERVER["REQUEST_METHOD"] == "POST") {
-    verify_csrf(); // Check Token
+    verify_csrf();
 
     $username = $_POST['username'];
     $password = $_POST['password'];
@@ -15,19 +15,19 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
     
     if($row = mysqli_fetch_assoc($res)) {
         if(password_verify($password, $row['password'])) {
-            session_regenerate_id(true); // Security
+            session_regenerate_id(true);
             $_SESSION["user_id"] = $row['id'];
             $_SESSION["role"] = $row['role'];
             $_SESSION["full_name"] = $row['full_name'];
             
-            setAlert('success', 'Login Successful', 'Welcome back!');
+            setAlert('success', 'Success', 'Login successful');
             
             if($role == 'admin') header("Location: ../admin/admin_dashboard.php");
             else header("Location: ../member/dashboard.php");
             exit;
         }
     }
-    setAlert('error', 'Login Failed', 'Invalid credentials.');
+    setAlert('error', 'Failed', 'Invalid credentials');
 }
 ?>
 <!DOCTYPE html>
@@ -46,7 +46,10 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" name="username" class="form-control" required>
+                    <input type="text" name="username" class="form-control" 
+                           pattern="[a-zA-Z0-9_]{3,20}" 
+                           title="Your username"
+                           required>
                 </div>
                 <div class="form-group">
                     <label>Password</label>
