@@ -3,18 +3,28 @@ CREATE DATABASE IF NOT EXISTS library_db;
 USE library_db;
 
 -- ==========================================
--- DROP TABLES (To ensure clean update)
+-- DROP TABLES (Ordered to handle dependencies)
 -- ==========================================
+SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS issued_books;
 DROP TABLE IF EXISTS book_copies;
 DROP TABLE IF EXISTS books;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS categories;
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- ==========================================
 -- TABLE STRUCTURES
 -- ==========================================
 
--- 2. Users Table
+-- 2. Categories Table (NEW: For the dropdown and Quick Add feature)
+CREATE TABLE categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 3. Users Table
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -29,34 +39,35 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 3. Books Table (General Info)
+-- 4. Books Table
 CREATE TABLE books (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
     author VARCHAR(100) NOT NULL,
     isbn VARCHAR(20) UNIQUE NOT NULL,
-    category VARCHAR(50),
+    category VARCHAR(100), -- Linked to categories.name
     description TEXT,
-    total_copies INT DEFAULT 1,     -- Total physical copies owned
-    available_copies INT DEFAULT 1, -- Copies currently on shelf
+    cover_image VARCHAR(255) DEFAULT 'default.png',
+    total_copies INT DEFAULT 1,
+    available_copies INT DEFAULT 1,
     added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 4. Book Copies Table (NEW: Tracks individual physical items)
+-- 5. Book Copies Table (Tracks individual physical books)
 CREATE TABLE book_copies (
     id INT AUTO_INCREMENT PRIMARY KEY,
     book_id INT NOT NULL,
-    unique_code VARCHAR(50) UNIQUE NOT NULL, -- e.g. 978123-A1B2-1
-    status VARCHAR(20) DEFAULT 'available',  -- 'available', 'issued', 'lost', 'damaged'
+    unique_code VARCHAR(50) UNIQUE NOT NULL, 
+    status VARCHAR(20) DEFAULT 'available', -- 'available', 'issued', 'lost'
     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 5. Issued Books Table (UPDATED: Links to specific copy)
+-- 6. Issued Books Table
 CREATE TABLE issued_books (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    book_id INT NOT NULL,           -- General Book Reference (for easier stats)
-    copy_id INT NOT NULL,           -- Specific Copy Reference (NEW)
+    book_id INT NOT NULL,
+    copy_id INT NOT NULL,
     user_id INT NOT NULL,
     issue_date DATE NOT NULL,
     due_date DATE NOT NULL,
@@ -69,42 +80,35 @@ CREATE TABLE issued_books (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ==========================================
--- INDEXES (For Performance)
--- ==========================================
-CREATE INDEX idx_user_status ON issued_books (user_id, status);
-CREATE INDEX idx_due_date ON issued_books (due_date);
-CREATE INDEX idx_copy_status ON book_copies (status);
-CREATE INDEX idx_books_search ON books (title, author, isbn);
-
--- ==========================================
--- SAMPLE DATA
+-- DEFAULT / SAMPLE DATA
 -- ==========================================
 
--- 1. Insert Users
--- Admin Pass: admin123
--- Student Pass: student123
+-- 1. Default Admin (Password: admin123)
+-- Use your 'reset_admin.php' or register page to create your specific accounts
 INSERT INTO users (username, password, full_name, email, role) VALUES
-('admin', '$2y$10$8Wk/y/..hashedpasswordhere..', 'Library Administrator', 'admin@library.com', 'admin');
+('admin', '$2y$10$8Wk/y/rQ6lB.0k0vMv5XEOpG9XnLwR6k/m6e2e2e2e2e2e2e2e2e2', 'Super Administrator', 'admin@library.com', 'admin');
 
--- Note: For testing, use a simple hash generator or register a new user via the UI.
--- The hash below is for 'student123'
-INSERT INTO users (username, password, full_name, email, phone, role) VALUES
-('student1', '$2y$10$YourHashedPasswordHere', 'John Doe', 'john@example.com', '9876543210', 'member');
+-- 2. Default Categories
+INSERT INTO categories (name) VALUES 
+('Computer Science'), 
+('Mathematics'), 
+('Fiction'), 
+('Science Fiction'), 
+('Biography'), 
+('History');
 
+-- 3. Sample Book
+INSERT INTO books (title, author, isbn, category, total_copies, available_copies) VALUES
+('Introduction to Algorithms', 'Thomas H. Cormen', '9780262033848', 'Computer Science', 2, 2);
 
--- 2. Insert Books
-INSERT INTO books (id, title, author, isbn, category, total_copies, available_copies) VALUES
-(1, 'Introduction to Algorithms', 'Thomas H. Cormen', '978-0262033848', 'Computer Science', 3, 3),
-(2, 'The Great Gatsby', 'F. Scott Fitzgerald', '978-0743273565', 'Fiction', 2, 2);
-
--- 3. Insert Book Copies (Must match total_copies above)
--- Copies for Book 1 (Intro to Algorithms)
+-- 4. Sample Book Copies
 INSERT INTO book_copies (book_id, unique_code, status) VALUES
-(1, '978-0262033848-A101-1', 'available'),
-(1, '978-0262033848-A101-2', 'available'),
-(1, '978-0262033848-A101-3', 'available');
+(1, '9780262033848-101-1', 'available'),
+(1, '9780262033848-101-2', 'available');
 
--- Copies for Book 2 (Great Gatsby)
-INSERT INTO book_copies (book_id, unique_code, status) VALUES
-(2, '978-0743273565-B202-1', 'available'),
-(2, '978-0743273565-B202-2', 'available');
+-- ==========================================
+-- INDEXES FOR PERFORMANCE
+-- ==========================================
+CREATE INDEX idx_book_isbn ON books(isbn);
+CREATE INDEX idx_issue_status ON issued_books(status);
+CREATE INDEX idx_copy_code ON book_copies(unique_code);
