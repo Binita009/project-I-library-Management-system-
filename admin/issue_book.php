@@ -41,8 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
     <title>Issue Book</title>
-    <!-- NOTE: Added ?v=2.1 to force browser to load NEW css -->
-    <link rel="stylesheet" href="../assets/css/style.css?v=2.1">
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/admin.css"> <!-- Add this line -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>

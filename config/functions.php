@@ -24,12 +24,15 @@ function setAlert($type, $title, $message) {
 
 // Image Helper
 function getBookCover($img) {
-    $path = "../assets/uploads/" . $img;
-    // Return path if file exists, else placeholder
-    if (!empty($img) && file_exists(__DIR__ . "/../assets/uploads/" . $img)) {
-        return $path;
+    // Define the path relative to the root of the site
+    $relative_path = "../assets/uploads/" . $img;
+    $server_path = $_SERVER['DOCUMENT_ROOT'] . "/library management system/assets/uploads/" . $img;
+
+    if (!empty($img) && file_exists($server_path)) {
+        return $relative_path;
     }
-    // Simple placeholder using text if image missing
-    return "https://via.placeholder.com/220x280.png?text=No+Cover";
+    
+    // Fallback to a valid placeholder URL
+    return "https://via.placeholder.com/150x200?text=No+Cover";
 }
 ?>

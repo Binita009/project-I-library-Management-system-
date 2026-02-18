@@ -28,7 +28,7 @@ a { text-decoration: none; color: inherit; }
 /* Sidebar - Fixed Width, Dark Background */
 .sidebar {
     width: 250px;
-    background-color: #2c3e50; /* Dark Blue */
+    background-color: #1e1e2d; /* Dark Blue */
     color: white;
     display: flex;
     flex-direction: column;

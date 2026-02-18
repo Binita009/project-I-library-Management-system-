@@ -23,8 +23,9 @@ $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC"
 <html lang="en">
 <head>
     <title>Manage Books</title>
-    <!-- Link to Master CSS -->
+    <!-- Add BOTH CSS files -->
     <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/admin.css"> <!-- THIS WAS MISSING -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
