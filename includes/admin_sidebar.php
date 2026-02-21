@@ -37,6 +37,9 @@
         <a href="reports.php" class="menu-item">
             <i class="fas fa-chart-line"></i> <span>Reports</span>
         </a>
+         <a href="profile.php" class="menu-item">
+            <i class="fas fa-user-cog"></i> <span>My Profile</span>
+        </a>
         
         <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
             <a href="../auth/logout.php" class="menu-item" style="color: #e74c3c;">
