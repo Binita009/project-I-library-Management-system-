@@ -29,6 +29,13 @@ $stmt2 = mysqli_prepare($conn, $status_sql);
 mysqli_stmt_bind_param($stmt2, "ii", $user_id, $book_id);
 mysqli_stmt_execute($stmt2);
 $is_borrowed = mysqli_stmt_fetch($stmt2);
+
+// 3. Check if the current user already requested this book
+$req_sql = "SELECT * FROM book_requests WHERE user_id = ? AND book_id = ? AND status = 'pending'";
+$stmt3 = mysqli_prepare($conn, $req_sql);
+mysqli_stmt_bind_param($stmt3, "ii", $user_id, $book_id);
+mysqli_stmt_execute($stmt3);
+$has_pending_request = mysqli_stmt_fetch($stmt3);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -47,6 +54,20 @@ $is_borrowed = mysqli_stmt_fetch($stmt2);
     <div class="main-content">
         <div class="content-header">
             <a href="books.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+            
+            <?php if($has_pending_request): ?>
+                <button class="btn btn-secondary" disabled><i class="fas fa-clock"></i> Request Pending</button>
+            <?php elseif($is_borrowed): ?>
+                <button class="btn btn-secondary" disabled>Currently Borrowed</button>
+            <?php elseif($book['available_copies'] > 0): ?>
+                <form action="request_book.php" method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="book_id" value="<?= $book['id'] ?>">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-hand-paper"></i> Request this Book</button>
+                </form>
+            <?php else: ?>
+                <button class="btn btn-secondary" disabled>Out of Stock</button>
+            <?php endif; ?>
         </div>
 
         <div class="card" style="max-width: 800px; margin: 0 auto;">

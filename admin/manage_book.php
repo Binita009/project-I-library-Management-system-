@@ -67,34 +67,39 @@ $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC"
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if(mysqli_num_rows($books) > 0): ?>
-                            <?php while($row = mysqli_fetch_assoc($books)): 
-                                $img = getBookCover($row['cover_image']);
-                            ?>
-                            <tr>
-                                <td><img src="<?= $img ?>" style="width: 40px; height: 50px; object-fit: cover; border-radius: 4px;"></td>
-                                <td style="font-family: monospace; color: #666;"><?= $row['isbn'] ?></td>
-                                <td>
-                                    <strong><?= htmlspecialchars($row['title']) ?></strong><br>
-                                    <small><?= htmlspecialchars($row['author']) ?></small>
-                                </td>
-                                <td>
-                                    <?php if($row['available_copies'] > 0): ?>
-                                        <span class="stock-badge in-stock"><?= $row['available_copies'] ?> Available</span>
-                                    <?php else: ?>
-                                        <span class="stock-badge out-stock">Out of Stock</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <a href="edit_book.php?id=<?= $row['id'] ?>" class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;"><i class="fas fa-edit"></i></a>
-                                    <a href="delete_book.php?id=<?= $row['id'] ?>" class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="return confirm('Delete this book?');"><i class="fas fa-trash"></i></a>
-                                </td>
-                            </tr>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <tr><td colspan="5" style="text-align: center; padding: 20px;">No books found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
+    <?php if(mysqli_num_rows($books) > 0): ?>
+        <?php while($row = mysqli_fetch_assoc($books)): 
+            // Correct way to call the image
+            $img_path = getBookCover($row['cover_image']);
+        ?>
+        <tr>
+            <td>
+                <div style="width: 50px; height: 70px; background: #eee; border-radius: 4px; overflow: hidden; border: 1px solid #ddd;">
+                    <img src="<?= $img_path ?>" style="width: 100%; height: 100%; object-fit: cover;" alt="Cover">
+                </div>
+            </td>
+            <td style="font-family: monospace; color: #666;"><?= $row['isbn'] ?></td>
+            <td>
+                <strong><?= htmlspecialchars($row['title']) ?></strong><br>
+                <small><?= htmlspecialchars($row['author']) ?></small>
+            </td>
+            <td>
+                <?php if($row['available_copies'] > 0): ?>
+                    <span class="badge badge-success"><?= $row['available_copies'] ?> Available</span>
+                <?php else: ?>
+                    <span class="badge badge-danger">Out of Stock</span>
+                <?php endif; ?>
+            </td>
+            <td>
+                <a href="edit_book.php?id=<?= $row['id'] ?>" class="btn btn-primary" style="padding: 5px 10px;"><i class="fas fa-edit"></i></a>
+                <a href="delete_book.php?id=<?= $row['id'] ?>" class="btn btn-danger" style="padding: 5px 10px;" onclick="return confirm('Delete?');"><i class="fas fa-trash"></i></a>
+            </td>
+        </tr>
+        <?php endwhile; ?>
+    <?php else: ?>
+        <tr><td colspan="5" style="text-align: center;">No books found.</td></tr>
+    <?php endif; ?>
+</tbody>
                 </table>
             </div>
         </div>

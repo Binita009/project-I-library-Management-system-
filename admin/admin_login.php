@@ -1,5 +1,4 @@
 <?php
-// admin/admin_login.php
 session_start();
 include('../config/db.php');
 
@@ -15,7 +14,6 @@ if(isset($_POST['login'])){
 
     if($result->num_rows == 1){
         $row = $result->fetch_assoc();
-        // Fix: Use password_verify
         if(password_verify($password, $row['password']) || $password === $row['password']){
             $_SESSION['user_id'] = $row['id'];
             $_SESSION['role'] = 'admin';
@@ -26,20 +24,20 @@ if(isset($_POST['login'])){
             $error = "Invalid Password";
         }
     } else {
-        $error = "Invalid Username or not an Admin";
+        $error = "Invalid Username or not a Librarian";
     }
 }
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Admin Login</title>
+    <title>Librarian Login</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/login.css">
 </head>
 <body>
     <div class="container">
-        <h2>Admin Login</h2>
+        <h2>Librarian Login</h2>
         <?php if(isset($error)) echo "<p class='error'>$error</p>"; ?>
         <form method="post">
             <input type="text" name="username" placeholder="Username" required>

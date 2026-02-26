@@ -26,6 +26,10 @@
             <i class="fas fa-book-reader"></i>
             <span>My Books</span>
         </a>
+        <a href="my_requests.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'my_requests.php' ? 'active' : ''; ?>">
+            <i class="fas fa-envelope-open-text"></i>
+            <span>My Requests</span>
+        </a>
         <a href="profile.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : ''; ?>">
             <i class="fas fa-user"></i>
             <span>My Profile</span>

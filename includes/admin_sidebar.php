@@ -1,12 +1,12 @@
 <div class="sidebar">
     <div class="sidebar-header">
-        <h3><i class="fas fa-book-reader"></i> LMS Admin</h3>
+        <h3><i class="fas fa-book-reader"></i> LMS Librarian</h3>
     </div>
     
     <div class="user-info">
         <div class="user-details">
             <h4 style="margin:0; font-size:16px; color: white;">
-                <?php echo htmlspecialchars($_SESSION['full_name'] ?? 'Admin'); ?>
+                <?php echo htmlspecialchars($_SESSION['full_name'] ?? 'Librarian'); ?>
             </h4>
             <span style="font-size:12px; color:#bdc3c7;">Librarian</span>
         </div>
@@ -21,6 +21,9 @@
         </a>
         <a href="manage_members.php" class="menu-item">
             <i class="fas fa-users"></i> <span>Manage Students</span>
+        </a>
+        <a href="manage_requests.php" class="menu-item">
+            <i class="fas fa-envelope-open-text"></i> <span>Book Requests</span>
         </a>
         <a href="issue_book.php" class="menu-item">
             <i class="fas fa-hand-holding"></i> <span>Issue Book</span>

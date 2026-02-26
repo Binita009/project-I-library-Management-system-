@@ -11,69 +11,18 @@ $page_title = "Home";
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        .hero {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 100px 0;
-            text-align: center;
-        }
-        .hero h1 {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
-        .hero p {
-            font-size: 20px;
-            margin-bottom: 30px;
-            max-width: 700px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        .features {
-            padding: 80px 0;
-            background: #f8f9fa;
-        }
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-top: 50px;
-        }
-        .feature-card {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            text-align: center;
-            transition: transform 0.3s;
-        }
-        .feature-card:hover {
-            transform: translateY(-10px);
-        }
-        .feature-icon {
-            font-size: 48px;
-            color: #667eea;
-            margin-bottom: 20px;
-        }
-        .stats {
-            background: #2c3e50;
-            color: white;
-            padding: 60px 0;
-        }
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 30px;
-            text-align: center;
-        }
-        .stat-number {
-            font-size: 36px;
-            font-weight: bold;
-            color: #3498db;
-        }
-        .cta {
-            padding: 80px 0;
-            text-align: center;
-        }
+        .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 100px 0; text-align: center; }
+        .hero h1 { font-size: 48px; margin-bottom: 20px; }
+        .hero p { font-size: 20px; margin-bottom: 30px; max-width: 700px; margin-left: auto; margin-right: auto; }
+        .features { padding: 80px 0; background: #f8f9fa; }
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 50px; }
+        .feature-card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; transition: transform 0.3s; }
+        .feature-card:hover { transform: translateY(-10px); }
+        .feature-icon { font-size: 48px; color: #667eea; margin-bottom: 20px; }
+        .stats { background: #2c3e50; color: white; padding: 60px 0; }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 30px; text-align: center; }
+        .stat-number { font-size: 36px; font-weight: bold; color: #3498db; }
+        .cta { padding: 80px 0; text-align: center; }
     </style>
 </head>
 <body>
@@ -87,7 +36,7 @@ $page_title = "Home";
                 <?php if(isset($_SESSION['user_id'])): ?>
                     <?php if($_SESSION['role'] == 'admin'): ?>
                         <a href="admin/admin_dashboard.php" class="btn btn-primary" style="padding: 15px 30px; font-size: 18px;">
-                            Go to Admin Panel
+                            Go to Librarian Panel
                         </a>
                     <?php else: ?>
                         <a href="member/dashboard.php" class="btn btn-primary" style="padding: 15px 30px; font-size: 18px;">

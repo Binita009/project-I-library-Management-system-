@@ -59,7 +59,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
                     <label>Role</label>
                     <select name="role" class="form-control">
                         <option value="member">Student</option>
-                        <option value="admin">Admin</option>
+                        <option value="admin">Librarian</option>
                     </select>
                 </div>
                 <button class="btn btn-primary" style="width: 100%;">Login</button>

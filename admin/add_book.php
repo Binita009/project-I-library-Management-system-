@@ -18,7 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if(isset($_FILES['cover']) && $_FILES['cover']['error'] == 0) {
         $ext = pathinfo($_FILES['cover']['name'], PATHINFO_EXTENSION);
         $new_name = uniqid() . "." . $ext;
-        if(move_uploaded_file($_FILES['cover']['tmp_name'], "../assets/uploads/" . $new_name)) {
+        
+        // Use an absolute path to save the file
+        $target_dir = $_SERVER['DOCUMENT_ROOT'] . "/library management system/assets/uploads/";
+        
+        if(move_uploaded_file($_FILES['cover']['tmp_name'], $target_dir . $new_name)) {
             $cover = $new_name;
         }
     }
