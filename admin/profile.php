@@ -104,8 +104,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                         <div class="form-group" style="flex: 1;">
                             <label>Phone Number</label>
-                            <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($admin['phone']) ?>">
-                        </div>
+<input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($admin['phone'] ?? '') ?>">                        </div>
                     </div>
 
                     <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;">
