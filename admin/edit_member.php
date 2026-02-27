@@ -1,5 +1,6 @@
 <?php
 require_once '../config/db.php';
+require_once '../config/validation.php';
 requireAdmin();
 
 if(!isset($_GET['id'])) {

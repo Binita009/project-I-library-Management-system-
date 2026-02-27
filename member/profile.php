@@ -1,5 +1,6 @@
 <?php
 require_once '../config/db.php';
+require_once '../config/validation.php'; // <--- ADD THIS LINE
 requireMember();
 
 $user_id = $_SESSION['user_id'];
