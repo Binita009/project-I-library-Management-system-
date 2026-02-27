@@ -23,7 +23,7 @@ if ($base_dir === 'admin' || $base_dir === 'member' || $base_dir === 'auth') {
     <!-- Link to the ONE Master CSS File -->
     <link rel="stylesheet" href="<?php echo $path; ?>assets/css/style.css">
     
-    <!-- FontAwesome (Keep this online or download locally if needed) -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
@@ -46,7 +46,9 @@ if ($base_dir === 'admin' || $base_dir === 'member' || $base_dir === 'auth') {
                     <li><a href="<?php echo $path; ?>auth/logout.php" class="btn btn-danger" style="padding: 5px 15px;">Logout</a></li>
                 
                 <?php else: ?>
-                    <li><a href="<?php echo $path; ?>auth/login.php">Login</a></li>
+                    <!-- Updated Separate Login Links -->
+                    <li><a href="<?php echo $path; ?>auth/student_login.php">Student Login</a></li>
+                    <li><a href="<?php echo $path; ?>auth/librarian_login.php" style="color: #f72585; font-weight: 600;">Librarian</a></li>
                     <li><a href="<?php echo $path; ?>auth/register.php" class="btn btn-primary" style="padding: 5px 15px; color: white;">Register</a></li>
                 <?php endif; ?>
             </ul>

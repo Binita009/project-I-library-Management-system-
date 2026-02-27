@@ -2,12 +2,10 @@
 require_once '../config/db.php';
 
 if($_SERVER["REQUEST_METHOD"] == "POST") {
-    verify_csrf();
-
-    $username = $_POST['username'];
+    $username = trim($_POST['username']);
     $password = $_POST['password'];
-    $role = $_POST['role'];
-    
+    $role = 'member'; // Hardcoded for student
+
     $stmt = mysqli_prepare($conn, "SELECT id, password, role, full_name FROM users WHERE username = ? AND role = ?");
     mysqli_stmt_bind_param($stmt, "ss", $username, $role);
     mysqli_stmt_execute($stmt);
@@ -21,51 +19,46 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION["full_name"] = $row['full_name'];
             
             setAlert('success', 'Success', 'Login successful');
-            
-            if($role == 'admin') header("Location: ../admin/admin_dashboard.php");
-            else header("Location: ../member/dashboard.php");
+            header("Location: ../member/dashboard.php");
             exit;
+        } else {
+            setAlert('error', 'Failed', 'Incorrect Password.');
         }
+    } else {
+        setAlert('error', 'Failed', 'Student account not found.');
     }
-    setAlert('error', 'Failed', 'Invalid credentials');
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Login</title>
+    <title>Student Login</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/auth.css">
 </head>
 <body>
     <div class="auth-container">
         <div class="auth-box">
-            <h2>Login</h2>
+            <h2 style="text-align:center; color: #4361ee;">Student Login</h2>
+            <p style="text-align:center; color:#666; margin-bottom:20px;">Welcome back to the library</p>
+
             <form class="auth-form" method="POST">
                 <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-                
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" name="username" class="form-control" 
-                           pattern="[a-zA-Z0-9_]{3,20}" 
-                           title="Your username"
-                           required>
+                    <input type="text" name="username" class="form-control" required>
                 </div>
                 <div class="form-group">
                     <label>Password</label>
                     <input type="password" name="password" class="form-control" required>
                 </div>
-                <div class="form-group">
-                    <label>Role</label>
-                    <select name="role" class="form-control">
-                        <option value="member">Student</option>
-                        <option value="admin">Librarian</option>
-                    </select>
-                </div>
                 <button class="btn btn-primary" style="width: 100%;">Login</button>
             </form>
+
             <div style="text-align: center; margin-top: 15px;">
-                <a href="register.php">Create Account</a>
+                <p>New student? <a href="register.php">Create Account</a></p>
+                <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+                <a href="librarian_login.php" style="color: #7f8c8d; font-size: 13px;">Switch to Librarian Login</a>
             </div>
         </div>
     </div>

@@ -2,11 +2,10 @@
 require_once '../config/db.php';
 requireAdmin();
 
-// Default Dates: First day of this month to Today
-$start_date = $_GET['start_date'] ?? date('Y-m-01');
-$end_date   = $_GET['end_date'] ?? date('Y-m-d');
-$report_type = $_GET['report_type'] ?? 'issue_history';
-
+// Wrap them in mysqli_real_escape_string
+$start_date = mysqli_real_escape_string($conn, $_GET['start_date'] ?? date('Y-m-01'));
+$end_date   = mysqli_real_escape_string($conn, $_GET['end_date'] ?? date('Y-m-d'));
+$report_type = mysqli_real_escape_string($conn, $_GET['report_type'] ?? 'issue_history');
 $results = null;
 
 // Logic based on Report Type

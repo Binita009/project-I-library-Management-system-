@@ -20,8 +20,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $new_name = uniqid() . "." . $ext;
         
         // Use an absolute path to save the file
-        $target_dir = $_SERVER['DOCUMENT_ROOT'] . "/library management system/assets/uploads/";
-        
+        // Safe relative directory creation
+$target_dir = __DIR__ . "/../assets/uploads/";
+
+// Automatically create the uploads folder if it doesn't exist yet
+if (!is_dir($target_dir)) {
+    mkdir($target_dir, 0777, true);
+}
         if(move_uploaded_file($_FILES['cover']['tmp_name'], $target_dir . $new_name)) {
             $cover = $new_name;
         }

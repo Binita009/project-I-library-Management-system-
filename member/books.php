@@ -2,8 +2,9 @@
 require_once '../config/db.php';
 requireMember();
 
-$search = $_GET['search'] ?? '';
-$cat = $_GET['category'] ?? '';
+// Wrap them in mysqli_real_escape_string
+$search = mysqli_real_escape_string($conn, $_GET['search'] ?? '');
+$cat = mysqli_real_escape_string($conn, $_GET['category'] ?? '');
 
 $sql = "SELECT * FROM books WHERE 1=1";
 if ($search) $sql .= " AND title LIKE '%$search%'";

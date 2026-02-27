@@ -26,23 +26,17 @@ function setAlert($type, $title, $message) {
 
 // THE FIX FOR THE PHOTO HOLDER
 function getBookCover($img) {
-    // 1. Detect the project folder name dynamically
-    $script_name = $_SERVER['SCRIPT_NAME']; 
-    $parts = explode('/', trim($script_name, '/'));
-    $project_folder = $parts[0]; 
+    $server_path = __DIR__ . "/../assets/uploads/" . $img;
 
-    // 2. Browser path (for the <img> src)
-    $browser_path = "/" . $project_folder . "/assets/uploads/" . $img;
-
-    // 3. Physical path (for PHP to check if file exists)
-    $server_path = $_SERVER['DOCUMENT_ROOT'] . "/" . $project_folder . "/assets/uploads/" . $img;
-
-    // 4. Check if image exists and is not empty
     if (!empty($img) && $img !== 'default.png' && file_exists($server_path)) {
-        return $browser_path;
+        // Find if the current script is running inside a sub-folder (admin, member, auth)
+        $in_subdir = in_array(basename(dirname($_SERVER['PHP_SELF'])), ['admin', 'member', 'auth']);
+        $prefix = $in_subdir ? '../' : ''; // Step back one folder if true
+        
+        return $prefix . "assets/uploads/" . $img;
     }
     
-    // Fallback to a high-quality placeholder if image is missing
+    // High-quality fallback placeholder
     return "https://via.placeholder.com/300x400?text=No+Cover+Found";
 }
 ?>

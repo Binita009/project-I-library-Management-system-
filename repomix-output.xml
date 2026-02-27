@@ -56,6 +56,7 @@ admin/issue_book.php
 admin/manage_book.php
 admin/manage_categories.php
 admin/manage_members.php
+admin/manage_requests.php
 admin/profile.php
 admin/reports.php
 admin/return_book.php
@@ -88,7 +89,9 @@ member/browse_categories.php
 member/dashboard.php
 member/issued_books.php
 member/member_sidebar.php
+member/my_requests.php
 member/profile.php
+member/request_book.php
 member/view_book.php
 member/viewBook.php
 README.md
@@ -1516,6 +1519,150 @@ $result = mysqli_query($conn, $sql);
 </html>
 </file>
 
+<file path="admin/manage_requests.php">
+<?php
+require_once '../config/db.php';
+requireAdmin();
+
+// Handle Approve / Reject
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && isset($_POST['request_id'])) {
+    verify_csrf();
+    $req_id = (int)$_POST['request_id'];
+    $action = $_POST['action'];
+
+    if ($action === 'approve') {
+        // Fetch request details
+        $req_info = mysqli_fetch_assoc(mysqli_query($conn, "SELECT user_id, book_id FROM book_requests WHERE id = $req_id AND status = 'pending'"));
+        if($req_info) {
+            $book_id = $req_info['book_id'];
+            $user_id = $req_info['user_id'];
+            
+            // Look for an available physical copy
+            $copy = mysqli_fetch_assoc(mysqli_query($conn, "SELECT id FROM book_copies WHERE book_id = $book_id AND status = 'available' LIMIT 1"));
+            
+            if($copy) {
+                $copy_id = $copy['id'];
+                $due_date = date('Y-m-d', strtotime('+15 days')); // Default 15 days borrowing period
+                
+                mysqli_begin_transaction($conn);
+                try {
+                    // Issue the book
+                    mysqli_query($conn, "INSERT INTO issued_books (book_id, copy_id, user_id, issue_date, due_date, status) VALUES ($book_id, $copy_id, $user_id, CURDATE(), '$due_date', 'issued')");
+                    mysqli_query($conn, "UPDATE book_copies SET status='issued' WHERE id=$copy_id");
+                    mysqli_query($conn, "UPDATE books SET available_copies=available_copies-1 WHERE id=$book_id");
+                    
+                    // Mark request as approved
+                    mysqli_query($conn, "UPDATE book_requests SET status = 'approved' WHERE id = $req_id");
+                    
+                    mysqli_commit($conn);
+                    setAlert('success', 'Approved', 'Request approved. Book has been issued!');
+                } catch (Exception $e) {
+                    mysqli_rollback($conn);
+                    setAlert('error', 'Error', 'Failed to issue the book.');
+                }
+            } else {
+                setAlert('error', 'Out of Stock', 'No copies available to issue right now.');
+            }
+        }
+    } elseif ($action === 'reject') {
+        mysqli_query($conn, "UPDATE book_requests SET status = 'rejected' WHERE id = $req_id");
+        setAlert('success', 'Rejected', 'Request has been rejected.');
+    }
+    
+    header("Location: manage_requests.php");
+    exit;
+}
+
+$sql = "SELECT br.*, b.title, u.full_name, u.username, b.available_copies
+        FROM book_requests br 
+        JOIN books b ON br.book_id = b.id 
+        JOIN users u ON br.user_id = u.id
+        ORDER BY FIELD(br.status, 'pending', 'approved', 'rejected'), br.request_date DESC";
+$result = mysqli_query($conn, $sql);
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Manage Book Requests</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+
+<div class="admin-container">
+    <?php include '../includes/admin_sidebar.php'; ?>
+
+    <div class="main-content">
+        <div class="content-header">
+            <h1>Manage Book Requests</h1>
+        </div>
+
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Requested Book</th>
+                            <th>Stock</th>
+                            <th>Date</th>
+                            <th>Status / Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (mysqli_num_rows($result) > 0): ?>
+                        <?php while ($row = mysqli_fetch_assoc($result)): ?>
+                        <tr>
+                            <td>
+                                <strong><?= htmlspecialchars($row['full_name']) ?></strong><br>
+                                <small><?= htmlspecialchars($row['username']) ?></small>
+                            </td>
+                            <td style="font-weight:600"><?= htmlspecialchars($row['title']) ?></td>
+                            <td>
+                                <?php if($row['available_copies'] > 0): ?>
+                                    <span class="badge badge-success"><?= $row['available_copies'] ?> Available</span>
+                                <?php else: ?>
+                                    <span class="badge badge-danger">Out of Stock</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= date('M d, Y h:i A', strtotime($row['request_date'])) ?></td>
+                            <td>
+                                <?php if($row['status'] == 'pending'): ?>
+                                    <form method="POST" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                                        <input type="hidden" name="request_id" value="<?= $row['id'] ?>">
+                                        
+                                        <button type="submit" name="action" value="approve" class="btn btn-success" style="padding: 5px 10px; font-size:12px;" <?= ($row['available_copies'] <= 0) ? 'disabled' : '' ?>>
+                                            <i class="fas fa-check"></i> Approve
+                                        </button>
+                                        
+                                        <button type="submit" name="action" value="reject" class="btn btn-danger" style="padding: 5px 10px; font-size:12px;" onclick="return confirm('Are you sure you want to reject this request?');">
+                                            <i class="fas fa-times"></i> Reject
+                                        </button>
+                                    </form>
+                                <?php elseif($row['status'] == 'approved'): ?>
+                                    <span class="badge badge-success">Approved</span>
+                                <?php else: ?>
+                                    <span class="badge badge-danger">Rejected</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr><td colspan="5" class="text-center">No requests found.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<?php include '../includes/footer.php'; ?>
+</body>
+</html>
+</file>
+
 <file path="admin/profile.php">
 <?php
 require_once '../config/db.php';
@@ -2235,89 +2382,28 @@ $result = mysqli_query($conn, $sql);
 </html>
 </file>
 
-<file path="member/member_sidebar.php">
-<?php if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'member') {
-    header("Location: ../auth/login.php");
-    exit;
-} ?>
-<div class="sidebar">
-    <div class="sidebar-header">
-        <h3><i class="fas fa-book"></i> <span>Library Member</span></h3>
-    </div>
-    <div class="user-info">
-        <div class="user-avatar">
-            <i class="fas fa-user"></i>
-        </div>
-        <div class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></div>
-        <div class="user-role">Student</div>
-    </div>
-    <div class="sidebar-menu">
-        <a href="dashboard.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
-            <i class="fas fa-tachometer-alt"></i>
-            <span>Dashboard</span>
-        </a>
-        <a href="books.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'books.php' ? 'active' : ''; ?>">
-            <i class="fas fa-book-open"></i>
-            <span>Browse Books</span>
-        </a>
-        <a href="issued_books.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'issued_books.php' ? 'active' : ''; ?>">
-            <i class="fas fa-book-reader"></i>
-            <span>My Books</span>
-        </a>
-        <a href="profile.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : ''; ?>">
-            <i class="fas fa-user"></i>
-            <span>My Profile</span>
-        </a>
-        <a href="browse_categories.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'browse_categories.php' ? 'active' : ''; ?>">
-       <i class="fas fa-th-large"></i>
-       <span>Categories</span>
-       </a>
-        <a href="../auth/logout.php" class="menu-item" style="margin-top: 20px; color: #e74c3c;">
-            <i class="fas fa-sign-out-alt"></i>
-            <span>Logout</span>
-        </a>
-    </div>
-</div>
-</file>
-
-<file path="member/view_book.php">
+<file path="member/my_requests.php">
 <?php
 require_once '../config/db.php';
 requireMember();
 
-if (!isset($_GET['id'])) {
-    header("Location: books.php");
-    exit;
-}
-
-$book_id = (int)$_GET['id'];
 $user_id = $_SESSION['user_id'];
 
-// 1. Fetch Book Details
-$sql = "SELECT * FROM books WHERE id = ?";
+$sql = "SELECT br.*, b.title, b.author 
+        FROM book_requests br 
+        JOIN books b ON br.book_id = b.id 
+        WHERE br.user_id = ? 
+        ORDER BY br.request_date DESC";
 $stmt = mysqli_prepare($conn, $sql);
-mysqli_stmt_bind_param($stmt, "i", $book_id);
+mysqli_stmt_bind_param($stmt, "i", $user_id);
 mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
-$book = mysqli_fetch_assoc($result);
-
-if (!$book) {
-    echo "Book not found.";
-    exit;
-}
-
-// 2. Check if the current user has this book issued
-$status_sql = "SELECT * FROM issued_books WHERE user_id = ? AND book_id = ? AND status = 'issued'";
-$stmt2 = mysqli_prepare($conn, $status_sql);
-mysqli_stmt_bind_param($stmt2, "ii", $user_id, $book_id);
-mysqli_stmt_execute($stmt2);
-$is_borrowed = mysqli_stmt_fetch($stmt2);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title><?= htmlspecialchars($book['title']) ?> - Details</title>
+    <title>My Book Requests</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -2329,81 +2415,78 @@ $is_borrowed = mysqli_stmt_fetch($stmt2);
 
     <div class="main-content">
         <div class="content-header">
-            <a href="books.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+            <h1>My Book Requests</h1>
         </div>
 
-        <div class="card" style="max-width: 800px; margin: 0 auto;">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
-                <div>
-                    <h1 style="margin-bottom: 10px; color: var(--primary);"><?= htmlspecialchars($book['title']) ?></h1>
-                    <h3 style="color: #7f8c8d; font-weight: 500;">by <?= htmlspecialchars($book['author']) ?></h3>
-                </div>
-                
-                <!-- Availability Badge -->
-                <div style="text-align: right;">
-                    <?php if($book['available_copies'] > 0): ?>
-                        <span class="badge badge-success" style="font-size: 14px; padding: 10px 15px;">
-                            <i class="fas fa-check-circle"></i> Available
-                        </span>
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Book Title</th>
+                            <th>Author</th>
+                            <th>Requested On</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (mysqli_num_rows($result) > 0): ?>
+                        <?php while ($row = mysqli_fetch_assoc($result)): ?>
+                        <tr>
+                            <td style="font-weight:600"><?= htmlspecialchars($row['title']) ?></td>
+                            <td><?= htmlspecialchars($row['author']) ?></td>
+                            <td><?= date('M d, Y h:i A', strtotime($row['request_date'])) ?></td>
+                            <td>
+                                <?php if($row['status'] == 'pending'): ?>
+                                    <span class="badge badge-warning">Pending</span>
+                                <?php elseif($row['status'] == 'approved'): ?>
+                                    <span class="badge badge-success">Approved (Issued)</span>
+                                <?php elseif($row['status'] == 'rejected'): ?>
+                                    <span class="badge badge-danger">Rejected</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
                     <?php else: ?>
-                        <span class="badge badge-danger" style="font-size: 14px; padding: 10px 15px;">
-                            <i class="fas fa-times-circle"></i> Out of Stock
-                        </span>
+                        <tr><td colspan="4" class="text-center">You have no book requests.</td></tr>
                     <?php endif; ?>
-                </div>
+                    </tbody>
+                </table>
             </div>
-
-            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-
-            <!-- User Borrow Status Notification -->
-            <?php if($is_borrowed): ?>
-                <div class="alert alert-warning" style="background: #fff3cd; color: #856404; border: 1px solid #ffeeba;">
-                    <i class="fas fa-info-circle"></i> <strong>Note:</strong> You currently have a copy of this book borrowed. 
-                    <a href="issued_books.php">Check Due Date</a>
-                </div>
-            <?php endif; ?>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 20px;">
-                <!-- Left Column -->
-                <div>
-                    <p><strong>Category:</strong> <br> <?= htmlspecialchars($book['category']) ?></p>
-                    <p style="margin-top: 15px;"><strong>ISBN:</strong> <br> <span style="font-family: monospace; background: #f8f9fa; padding: 2px 6px;"><?= htmlspecialchars($book['isbn']) ?></span></p>
-                </div>
-
-                <!-- Right Column -->
-                <div>
-                    <p><strong>Stock Info:</strong></p>
-                    <ul style="list-style: none; padding: 0; color: #666;">
-                        <li>Total Copies: <?= $book['total_copies'] ?></li>
-                        <li>Currently Available: <strong><?= $book['available_copies'] ?></strong></li>
-                    </ul>
-                </div>
-            </div>
-
-            <div style="margin-top: 30px;">
-                <h4 style="margin-bottom: 10px;">Description</h4>
-                <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; line-height: 1.6; color: #444;">
-                    <?php 
-                    if (!empty($book['description'])) {
-                        echo nl2br(htmlspecialchars($book['description'])); 
-                    } else {
-                        echo "<em>No description available for this book.</em>";
-                    }
-                    ?>
-                </div>
-            </div>
-
         </div>
     </div>
 </div>
-
-<style>
-    .badge-success { background: #d4edda; color: #155724; }
-    .badge-danger { background: #f8d7da; color: #721c24; }
-</style>
-
+<?php include '../includes/footer.php'; ?>
 </body>
 </html>
+</file>
+
+<file path="member/request_book.php">
+<?php
+require_once '../config/db.php';
+requireMember();
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['book_id'])) {
+    verify_csrf();
+    $book_id = (int)$_POST['book_id'];
+    $user_id = $_SESSION['user_id'];
+
+    // Check if already requested and pending
+    $check = mysqli_query($conn, "SELECT id FROM book_requests WHERE user_id = $user_id AND book_id = $book_id AND status = 'pending'");
+    
+    if (mysqli_num_rows($check) > 0) {
+        setAlert('error', 'Already Requested', 'You already have a pending request for this book.');
+    } else {
+        mysqli_query($conn, "INSERT INTO book_requests (user_id, book_id) VALUES ($user_id, $book_id)");
+        setAlert('success', 'Success', 'Book requested successfully! A librarian will review your request.');
+    }
+    header("Location: view_book.php?id=" . $book_id);
+    exit;
+}
+
+header("Location: books.php");
+exit;
+?>
 </file>
 
 <file path="member/viewBook.php">
@@ -2535,60 +2618,6 @@ $is_borrowed = mysqli_stmt_fetch($stmt2);
 <file path="README.md">
 # project-I-library-Management-system-
 4 semester main project
-</file>
-
-<file path="admin/admin_login.php">
-<?php
-// admin/admin_login.php
-session_start();
-include('../config/db.php');
-
-if(isset($_POST['login'])){
-    $username = $_POST['username'];
-    $password = $_POST['password'];
-
-    // Fix: Query 'users' table where role is admin
-    $stmt = $conn->prepare("SELECT id, username, password, full_name FROM users WHERE username=? AND role='admin'");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if($result->num_rows == 1){
-        $row = $result->fetch_assoc();
-        // Fix: Use password_verify
-        if(password_verify($password, $row['password']) || $password === $row['password']){
-            $_SESSION['user_id'] = $row['id'];
-            $_SESSION['role'] = 'admin';
-            $_SESSION['full_name'] = $row['full_name'];
-            header("Location: admin_dashboard.php");
-            exit();
-        } else {
-            $error = "Invalid Password";
-        }
-    } else {
-        $error = "Invalid Username or not an Admin";
-    }
-}
-?>
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Admin Login</title>
-    <link rel="stylesheet" href="../assets/css/style.css">
-    <link rel="stylesheet" href="../assets/css/login.css">
-</head>
-<body>
-    <div class="container">
-        <h2>Admin Login</h2>
-        <?php if(isset($error)) echo "<p class='error'>$error</p>"; ?>
-        <form method="post">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit" name="login">Login</button>
-        </form>
-    </div>
-</body>
-</html>
 </file>
 
 <file path="admin/fix_code.php">
@@ -2749,57 +2778,6 @@ if (isset($_GET['delete'])) {
 </html>
 </file>
 
-<file path="config/functions.php">
-<?php
-// CSRF Security
-function csrf_token() {
-    if (session_status() === PHP_SESSION_NONE) session_start();
-    if (empty($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION['csrf_token'];
-}
-
-function verify_csrf() {
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        die("Security Validation Failed. Please go back and refresh.");
-    }
-}
-
-// Set Alert for Custom Toast
-function setAlert($type, $title, $message) {
-    if (session_status() === PHP_SESSION_NONE) session_start();
-    $_SESSION['alert'] = [
-        'type' => $type, 
-        'title' => $title,
-        'message' => $message
-    ];
-}
-
-// THE FIX FOR THE PHOTO HOLDER
-function getBookCover($img) {
-    // 1. Detect the project folder name dynamically
-    $script_name = $_SERVER['SCRIPT_NAME']; 
-    $parts = explode('/', trim($script_name, '/'));
-    $project_folder = $parts[0]; 
-
-    // 2. Browser path (for the <img> src)
-    $browser_path = "/" . $project_folder . "/assets/uploads/" . $img;
-
-    // 3. Physical path (for PHP to check if file exists)
-    $server_path = $_SERVER['DOCUMENT_ROOT'] . "/" . $project_folder . "/assets/uploads/" . $img;
-
-    // 4. Check if image exists and is not empty
-    if (!empty($img) && $img !== 'default.png' && file_exists($server_path)) {
-        return $browser_path;
-    }
-    
-    // Fallback to a high-quality placeholder if image is missing
-    return "https://via.placeholder.com/300x400?text=No+Cover+Found";
-}
-?>
-</file>
-
 <file path="includes/header.php">
 <?php
 if (session_status() === PHP_SESSION_NONE) {
@@ -2857,203 +2835,250 @@ if ($base_dir === 'admin' || $base_dir === 'member' || $base_dir === 'auth') {
     </nav>
 </file>
 
-<file path="index.php">
+<file path="member/member_sidebar.php">
+<?php if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'member') {
+    header("Location: ../auth/login.php");
+    exit;
+} ?>
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h3><i class="fas fa-book"></i> <span>Library Member</span></h3>
+    </div>
+    <div class="user-info">
+        <div class="user-avatar">
+            <i class="fas fa-user"></i>
+        </div>
+        <div class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></div>
+        <div class="user-role">Student</div>
+    </div>
+    <div class="sidebar-menu">
+        <a href="dashboard.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
+            <i class="fas fa-tachometer-alt"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="books.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'books.php' ? 'active' : ''; ?>">
+            <i class="fas fa-book-open"></i>
+            <span>Browse Books</span>
+        </a>
+        <a href="issued_books.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'issued_books.php' ? 'active' : ''; ?>">
+            <i class="fas fa-book-reader"></i>
+            <span>My Books</span>
+        </a>
+        <a href="my_requests.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'my_requests.php' ? 'active' : ''; ?>">
+            <i class="fas fa-envelope-open-text"></i>
+            <span>My Requests</span>
+        </a>
+        <a href="profile.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : ''; ?>">
+            <i class="fas fa-user"></i>
+            <span>My Profile</span>
+        </a>
+        <a href="browse_categories.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'browse_categories.php' ? 'active' : ''; ?>">
+       <i class="fas fa-th-large"></i>
+       <span>Categories</span>
+       </a>
+        <a href="../auth/logout.php" class="menu-item" style="margin-top: 20px; color: #e74c3c;">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Logout</span>
+        </a>
+    </div>
+</div>
+</file>
+
+<file path="member/view_book.php">
 <?php
-require_once 'config/db.php';
-$page_title = "Home";
+require_once '../config/db.php';
+requireMember();
+
+if (!isset($_GET['id'])) {
+    header("Location: books.php");
+    exit;
+}
+
+$book_id = (int)$_GET['id'];
+$user_id = $_SESSION['user_id'];
+
+// 1. Fetch Book Details
+$sql = "SELECT * FROM books WHERE id = ?";
+$stmt = mysqli_prepare($conn, $sql);
+mysqli_stmt_bind_param($stmt, "i", $book_id);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+$book = mysqli_fetch_assoc($result);
+
+if (!$book) {
+    echo "Book not found.";
+    exit;
+}
+
+// 2. Check if the current user has this book issued
+$status_sql = "SELECT * FROM issued_books WHERE user_id = ? AND book_id = ? AND status = 'issued'";
+$stmt2 = mysqli_prepare($conn, $status_sql);
+mysqli_stmt_bind_param($stmt2, "ii", $user_id, $book_id);
+mysqli_stmt_execute($stmt2);
+$is_borrowed = mysqli_stmt_fetch($stmt2);
+
+// 3. Check if the current user already requested this book
+$req_sql = "SELECT * FROM book_requests WHERE user_id = ? AND book_id = ? AND status = 'pending'";
+$stmt3 = mysqli_prepare($conn, $req_sql);
+mysqli_stmt_bind_param($stmt3, "ii", $user_id, $book_id);
+mysqli_stmt_execute($stmt3);
+$has_pending_request = mysqli_stmt_fetch($stmt3);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Library Management System</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <title><?= htmlspecialchars($book['title']) ?> - Details</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        .hero {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 100px 0;
-            text-align: center;
-        }
-        .hero h1 {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
-        .hero p {
-            font-size: 20px;
-            margin-bottom: 30px;
-            max-width: 700px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        .features {
-            padding: 80px 0;
-            background: #f8f9fa;
-        }
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-top: 50px;
-        }
-        .feature-card {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            text-align: center;
-            transition: transform 0.3s;
-        }
-        .feature-card:hover {
-            transform: translateY(-10px);
-        }
-        .feature-icon {
-            font-size: 48px;
-            color: #667eea;
-            margin-bottom: 20px;
-        }
-        .stats {
-            background: #2c3e50;
-            color: white;
-            padding: 60px 0;
-        }
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 30px;
-            text-align: center;
-        }
-        .stat-number {
-            font-size: 36px;
-            font-weight: bold;
-            color: #3498db;
-        }
-        .cta {
-            padding: 80px 0;
-            text-align: center;
-        }
-    </style>
 </head>
 <body>
-    <?php include 'includes/header.php'; ?>
-    
-    <section class="hero">
-        <div class="container">
-            <h1>Welcome to Our Library</h1>
-            <p>Explore thousands of books, manage your reading, and join our community of readers. Perfect for students and book lovers.</p>
-            <div style="display: flex; gap: 20px; justify-content: center;">
-                <?php if(isset($_SESSION['user_id'])): ?>
-                    <?php if($_SESSION['role'] == 'admin'): ?>
-                        <a href="admin/admin_dashboard.php" class="btn btn-primary" style="padding: 15px 30px; font-size: 18px;">
-                            Go to Admin Panel
-                        </a>
+
+<div class="admin-container">
+    <?php include 'member_sidebar.php'; ?>
+
+    <div class="main-content">
+        <div class="content-header">
+            <a href="books.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+            
+            <?php if($has_pending_request): ?>
+                <button class="btn btn-secondary" disabled><i class="fas fa-clock"></i> Request Pending</button>
+            <?php elseif($is_borrowed): ?>
+                <button class="btn btn-secondary" disabled>Currently Borrowed</button>
+            <?php elseif($book['available_copies'] > 0): ?>
+                <form action="request_book.php" method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="book_id" value="<?= $book['id'] ?>">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-hand-paper"></i> Request this Book</button>
+                </form>
+            <?php else: ?>
+                <button class="btn btn-secondary" disabled>Out of Stock</button>
+            <?php endif; ?>
+        </div>
+
+        <div class="card" style="max-width: 800px; margin: 0 auto;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div>
+                    <h1 style="margin-bottom: 10px; color: var(--primary);"><?= htmlspecialchars($book['title']) ?></h1>
+                    <h3 style="color: #7f8c8d; font-weight: 500;">by <?= htmlspecialchars($book['author']) ?></h3>
+                </div>
+                
+                <!-- Availability Badge -->
+                <div style="text-align: right;">
+                    <?php if($book['available_copies'] > 0): ?>
+                        <span class="badge badge-success" style="font-size: 14px; padding: 10px 15px;">
+                            <i class="fas fa-check-circle"></i> Available
+                        </span>
                     <?php else: ?>
-                        <a href="member/dashboard.php" class="btn btn-primary" style="padding: 15px 30px; font-size: 18px;">
-                            Go to My Account
-                        </a>
+                        <span class="badge badge-danger" style="font-size: 14px; padding: 10px 15px;">
+                            <i class="fas fa-times-circle"></i> Out of Stock
+                        </span>
                     <?php endif; ?>
-                <?php else: ?>
-                    <a href="auth/register.php" class="btn btn-primary" style="padding: 15px 30px; font-size: 18px;">
-                        Join Now
-                    </a>
-                    <a href="member/books.php" class="btn" style="padding: 15px 30px; font-size: 18px; background: white; color: #667eea;">
-                        Browse Books
-                    </a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </section>
-    
-    <section class="features">
-        <div class="container">
-            <h2 style="text-align: center; margin-bottom: 50px; color: #2c3e50;">Features</h2>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-book"></i>
-                    </div>
-                    <h3>Book Management</h3>
-                    <p>Add, edit, and manage books in the library collection with easy CRUD operations.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-user-friends"></i>
-                    </div>
-                    <h3>Member Management</h3>
-                    <p>Manage student accounts, track borrowing history, and monitor library usage.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-exchange-alt"></i>
-                    </div>
-                    <h3>Book Issuing System</h3>
-                    <p>Simple book issuing and returning system with due date tracking.</p>
                 </div>
             </div>
-        </div>
-    </section>
-    
-    <section class="stats">
-        <div class="container">
-            <h2 style="text-align: center; margin-bottom: 50px;">Library Statistics</h2>
-            <div class="stat-grid">
-                <?php
-                // Get statistics
-                $total_books = mysqli_query($conn, "SELECT COUNT(*) as count FROM books")->fetch_assoc()['count'];
-                $total_members = mysqli_query($conn, "SELECT COUNT(*) as count FROM users WHERE role='member'")->fetch_assoc()['count'];
-                $issued_books = mysqli_query($conn, "SELECT COUNT(*) as count FROM issued_books WHERE status='issued'")->fetch_assoc()['count'];
-                $available_books = mysqli_query($conn, "SELECT SUM(available_copies) as total FROM books")->fetch_assoc()['total'];
-                ?>
-                <div>
-                    <div class="stat-number"><?php echo $total_books; ?></div>
-                    <p>Total Books</p>
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+            <!-- User Borrow Status Notification -->
+            <?php if($is_borrowed): ?>
+                <div class="alert alert-warning" style="background: #fff3cd; color: #856404; border: 1px solid #ffeeba;">
+                    <i class="fas fa-info-circle"></i> <strong>Note:</strong> You currently have a copy of this book borrowed. 
+                    <a href="issued_books.php">Check Due Date</a>
                 </div>
+            <?php endif; ?>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 20px;">
+                <!-- Left Column -->
                 <div>
-                    <div class="stat-number"><?php echo $total_members; ?></div>
-                    <p>Registered Students</p>
+                    <p><strong>Category:</strong> <br> <?= htmlspecialchars($book['category']) ?></p>
+                    <p style="margin-top: 15px;"><strong>ISBN:</strong> <br> <span style="font-family: monospace; background: #f8f9fa; padding: 2px 6px;"><?= htmlspecialchars($book['isbn']) ?></span></p>
                 </div>
+
+                <!-- Right Column -->
                 <div>
-                    <div class="stat-number"><?php echo $issued_books; ?></div>
-                    <p>Books Issued</p>
-                </div>
-                <div>
-                    <div class="stat-number"><?php echo $available_books; ?></div>
-                    <p>Available Books</p>
+                    <p><strong>Stock Info:</strong></p>
+                    <ul style="list-style: none; padding: 0; color: #666;">
+                        <li>Total Copies: <?= $book['total_copies'] ?></li>
+                        <li>Currently Available: <strong><?= $book['available_copies'] ?></strong></li>
+                    </ul>
                 </div>
             </div>
-        </div>
-    </section>
-    
-    <section class="cta">
-        <div class="container">
-            <h2 style="color: #2c3e50; margin-bottom: 30px;">Ready to Start?</h2>
-            <p style="font-size: 18px; color: #666; margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto;">
-                Join our library community today and access thousands of books. Whether you're a student or a librarian, we have the tools you need.
-            </p>
-            <div style="display: flex; gap: 20px; justify-content: center;">
-                <?php if(!isset($_SESSION['user_id'])): ?>
-                    <a href="auth/register.php" class="btn btn-primary" style="padding: 15px 40px; font-size: 18px;">
-                        <i class="fas fa-user-plus"></i> Sign Up Free
-                    </a>
-                    <a href="auth/login.php" class="btn" style="padding: 15px 40px; font-size: 18px; background: #2c3e50; color: white;">
-                        <i class="fas fa-sign-in-alt"></i> Login
-                    </a>
-                <?php else: ?>
-                    <a href="member/books.php" class="btn btn-primary" style="padding: 15px 40px; font-size: 18px;">
-                        <i class="fas fa-book-open"></i> Browse Books
-                    </a>
-                <?php endif; ?>
+
+            <div style="margin-top: 30px;">
+                <h4 style="margin-bottom: 10px;">Description</h4>
+                <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; line-height: 1.6; color: #444;">
+                    <?php 
+                    if (!empty($book['description'])) {
+                        echo nl2br(htmlspecialchars($book['description'])); 
+                    } else {
+                        echo "<em>No description available for this book.</em>";
+                    }
+                    ?>
+                </div>
             </div>
+
         </div>
-    </section>
-    
-    <?php include 'includes/footer.php'; ?>
-    
-    <script src="assets/js/validation.js"></script>
+    </div>
+</div>
+
+<style>
+    .badge-success { background: #d4edda; color: #155724; }
+    .badge-danger { background: #f8d7da; color: #721c24; }
+</style>
+
+</body>
+</html>
+</file>
+
+<file path="admin/admin_login.php">
+<?php
+session_start();
+include('../config/db.php');
+
+if(isset($_POST['login'])){
+    $username = $_POST['username'];
+    $password = $_POST['password'];
+
+    // Fix: Query 'users' table where role is admin
+    $stmt = $conn->prepare("SELECT id, username, password, full_name FROM users WHERE username=? AND role='admin'");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if($result->num_rows == 1){
+        $row = $result->fetch_assoc();
+        if(password_verify($password, $row['password']) || $password === $row['password']){
+            $_SESSION['user_id'] = $row['id'];
+            $_SESSION['role'] = 'admin';
+            $_SESSION['full_name'] = $row['full_name'];
+            header("Location: admin_dashboard.php");
+            exit();
+        } else {
+            $error = "Invalid Password";
+        }
+    } else {
+        $error = "Invalid Username or not a Librarian";
+    }
+}
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Librarian Login</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/login.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Librarian Login</h2>
+        <?php if(isset($error)) echo "<p class='error'>$error</p>"; ?>
+        <form method="post">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit" name="login">Login</button>
+        </form>
+    </div>
 </body>
 </html>
 </file>
@@ -3946,6 +3971,207 @@ function requireMember() {
     }
 }
 ?>
+</file>
+
+<file path="config/functions.php">
+<?php
+// CSRF Security
+function csrf_token() {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function verify_csrf() {
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die("Security Validation Failed. Please go back and refresh.");
+    }
+}
+
+// Set Alert for Custom Toast
+function setAlert($type, $title, $message) {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $_SESSION['alert'] = [
+        'type' => $type, 
+        'title' => $title,
+        'message' => $message
+    ];
+}
+
+// THE FIX FOR THE PHOTO HOLDER
+function getBookCover($img) {
+    // 1. Detect the project folder name dynamically
+    $script_name = $_SERVER['SCRIPT_NAME']; 
+    $parts = explode('/', trim($script_name, '/'));
+    $project_folder = $parts[0]; 
+
+    // 2. Browser path (for the <img> src)
+    $browser_path = "/" . $project_folder . "/assets/uploads/" . $img;
+
+    // 3. Physical path (for PHP to check if file exists)
+    $server_path = $_SERVER['DOCUMENT_ROOT'] . "/" . $project_folder . "/assets/uploads/" . $img;
+
+    // 4. Check if image exists and is not empty
+    if (!empty($img) && $img !== 'default.png' && file_exists($server_path)) {
+        return $browser_path;
+    }
+    
+    // Fallback to a high-quality placeholder if image is missing
+    return "https://via.placeholder.com/300x400?text=No+Cover+Found";
+}
+?>
+</file>
+
+<file path="index.php">
+<?php
+require_once 'config/db.php';
+$page_title = "Home";
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Management System</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 100px 0; text-align: center; }
+        .hero h1 { font-size: 48px; margin-bottom: 20px; }
+        .hero p { font-size: 20px; margin-bottom: 30px; max-width: 700px; margin-left: auto; margin-right: auto; }
+        .features { padding: 80px 0; background: #f8f9fa; }
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 50px; }
+        .feature-card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; transition: transform 0.3s; }
+        .feature-card:hover { transform: translateY(-10px); }
+        .feature-icon { font-size: 48px; color: #667eea; margin-bottom: 20px; }
+        .stats { background: #2c3e50; color: white; padding: 60px 0; }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 30px; text-align: center; }
+        .stat-number { font-size: 36px; font-weight: bold; color: #3498db; }
+        .cta { padding: 80px 0; text-align: center; }
+    </style>
+</head>
+<body>
+    <?php include 'includes/header.php'; ?>
+    
+    <section class="hero">
+        <div class="container">
+            <h1>Welcome to Our Library</h1>
+            <p>Explore thousands of books, manage your reading, and join our community of readers. Perfect for students and book lovers.</p>
+            <div style="display: flex; gap: 20px; justify-content: center;">
+                <?php if(isset($_SESSION['user_id'])): ?>
+                    <?php if($_SESSION['role'] == 'admin'): ?>
+                        <a href="admin/admin_dashboard.php" class="btn btn-primary" style="padding: 15px 30px; font-size: 18px;">
+                            Go to Librarian Panel
+                        </a>
+                    <?php else: ?>
+                        <a href="member/dashboard.php" class="btn btn-primary" style="padding: 15px 30px; font-size: 18px;">
+                            Go to My Account
+                        </a>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <a href="auth/register.php" class="btn btn-primary" style="padding: 15px 30px; font-size: 18px;">
+                        Join Now
+                    </a>
+                    <a href="member/books.php" class="btn" style="padding: 15px 30px; font-size: 18px; background: white; color: #667eea;">
+                        Browse Books
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </section>
+    
+    <section class="features">
+        <div class="container">
+            <h2 style="text-align: center; margin-bottom: 50px; color: #2c3e50;">Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-book"></i>
+                    </div>
+                    <h3>Book Management</h3>
+                    <p>Add, edit, and manage books in the library collection with easy CRUD operations.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-user-friends"></i>
+                    </div>
+                    <h3>Member Management</h3>
+                    <p>Manage student accounts, track borrowing history, and monitor library usage.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-exchange-alt"></i>
+                    </div>
+                    <h3>Book Issuing System</h3>
+                    <p>Simple book issuing and returning system with due date tracking.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="stats">
+        <div class="container">
+            <h2 style="text-align: center; margin-bottom: 50px;">Library Statistics</h2>
+            <div class="stat-grid">
+                <?php
+                // Get statistics
+                $total_books = mysqli_query($conn, "SELECT COUNT(*) as count FROM books")->fetch_assoc()['count'];
+                $total_members = mysqli_query($conn, "SELECT COUNT(*) as count FROM users WHERE role='member'")->fetch_assoc()['count'];
+                $issued_books = mysqli_query($conn, "SELECT COUNT(*) as count FROM issued_books WHERE status='issued'")->fetch_assoc()['count'];
+                $available_books = mysqli_query($conn, "SELECT SUM(available_copies) as total FROM books")->fetch_assoc()['total'];
+                ?>
+                <div>
+                    <div class="stat-number"><?php echo $total_books; ?></div>
+                    <p>Total Books</p>
+                </div>
+                <div>
+                    <div class="stat-number"><?php echo $total_members; ?></div>
+                    <p>Registered Students</p>
+                </div>
+                <div>
+                    <div class="stat-number"><?php echo $issued_books; ?></div>
+                    <p>Books Issued</p>
+                </div>
+                <div>
+                    <div class="stat-number"><?php echo $available_books; ?></div>
+                    <p>Available Books</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="cta">
+        <div class="container">
+            <h2 style="color: #2c3e50; margin-bottom: 30px;">Ready to Start?</h2>
+            <p style="font-size: 18px; color: #666; margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto;">
+                Join our library community today and access thousands of books. Whether you're a student or a librarian, we have the tools you need.
+            </p>
+            <div style="display: flex; gap: 20px; justify-content: center;">
+                <?php if(!isset($_SESSION['user_id'])): ?>
+                    <a href="auth/register.php" class="btn btn-primary" style="padding: 15px 40px; font-size: 18px;">
+                        <i class="fas fa-user-plus"></i> Sign Up Free
+                    </a>
+                    <a href="auth/login.php" class="btn" style="padding: 15px 40px; font-size: 18px; background: #2c3e50; color: white;">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </a>
+                <?php else: ?>
+                    <a href="member/books.php" class="btn btn-primary" style="padding: 15px 40px; font-size: 18px;">
+                        <i class="fas fa-book-open"></i> Browse Books
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </section>
+    
+    <?php include 'includes/footer.php'; ?>
+    
+    <script src="assets/js/validation.js"></script>
+</body>
+</html>
 </file>
 
 <file path="admin/edit_book.php">
@@ -4866,195 +5092,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </html>
 </file>
 
-<file path="admin/manage_book.php">
-<?php
-require_once '../config/db.php';
-requireAdmin();
-
-$search = $_GET['search'] ?? '';
-$category_filter = $_GET['category'] ?? '';
-
-$sql = "SELECT * FROM books WHERE 1=1";
-
-if($search) {
-    $search = mysqli_real_escape_string($conn, $search);
-    $sql .= " AND (title LIKE '%$search%' OR author LIKE '%$search%' OR isbn LIKE '%$search%')";
-}
-if($category_filter) {
-    $cat_safe = mysqli_real_escape_string($conn, $category_filter);
-    $sql .= " AND category = '$cat_safe'";
-}
-$sql .= " ORDER BY id DESC";
-$books = mysqli_query($conn, $sql);
-$cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>Manage Books</title>
-    <!-- Add BOTH CSS files -->
-    <link rel="stylesheet" href="../assets/css/style.css">
-    <link rel="stylesheet" href="../assets/css/admin.css"> <!-- THIS WAS MISSING -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-</head>
-<body>
-    <div class="admin-container">
-        <?php include '../includes/admin_sidebar.php'; ?>
-        
-        <div class="main-content">
-            <div class="content-header">
-                <h1>Manage Books</h1>
-                <a href="add_book.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Book</a>
-            </div>
-            
-            <div class="card">
-                <!-- Search -->
-                <form method="GET" style="margin-bottom: 25px; display: flex; gap: 10px;">
-                    <input type="text" name="search" class="form-control" placeholder="Search..." value="<?= htmlspecialchars($search) ?>">
-                    <select name="category" class="form-control" style="width: 200px;">
-                        <option value="">All Categories</option>
-                        <?php while($c = mysqli_fetch_assoc($cat_query)): ?>
-                            <option value="<?= htmlspecialchars($c['name']) ?>" <?= ($category_filter == $c['name']) ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($c['name']) ?>
-                            </option>
-                        <?php endwhile; ?>
-                    </select>
-                    <button class="btn btn-primary">Filter</button>
-                    <?php if($search || $category_filter): ?>
-                        <a href="manage_book.php" class="btn btn-secondary">Clear</a>
-                    <?php endif; ?>
-                </form>
-
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Cover</th>
-                            <th>ISBN</th>
-                            <th>Title</th>
-                            <th>Stock</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-    <?php if(mysqli_num_rows($books) > 0): ?>
-        <?php while($row = mysqli_fetch_assoc($books)): 
-            // Correct way to call the image
-            $img_path = getBookCover($row['cover_image']);
-        ?>
-        <tr>
-            <td>
-                <div style="width: 50px; height: 70px; background: #eee; border-radius: 4px; overflow: hidden; border: 1px solid #ddd;">
-                    <img src="<?= $img_path ?>" style="width: 100%; height: 100%; object-fit: cover;" alt="Cover">
-                </div>
-            </td>
-            <td style="font-family: monospace; color: #666;"><?= $row['isbn'] ?></td>
-            <td>
-                <strong><?= htmlspecialchars($row['title']) ?></strong><br>
-                <small><?= htmlspecialchars($row['author']) ?></small>
-            </td>
-            <td>
-                <?php if($row['available_copies'] > 0): ?>
-                    <span class="badge badge-success"><?= $row['available_copies'] ?> Available</span>
-                <?php else: ?>
-                    <span class="badge badge-danger">Out of Stock</span>
-                <?php endif; ?>
-            </td>
-            <td>
-                <a href="edit_book.php?id=<?= $row['id'] ?>" class="btn btn-primary" style="padding: 5px 10px;"><i class="fas fa-edit"></i></a>
-                <a href="delete_book.php?id=<?= $row['id'] ?>" class="btn btn-danger" style="padding: 5px 10px;" onclick="return confirm('Delete?');"><i class="fas fa-trash"></i></a>
-            </td>
-        </tr>
-        <?php endwhile; ?>
-    <?php else: ?>
-        <tr><td colspan="5" style="text-align: center;">No books found.</td></tr>
-    <?php endif; ?>
-</tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    <?php include '../includes/footer.php'; ?>
-</body>
-</html>
-</file>
-
-<file path="auth/login.php">
-<?php
-require_once '../config/db.php';
-
-if($_SERVER["REQUEST_METHOD"] == "POST") {
-    verify_csrf();
-
-    $username = $_POST['username'];
-    $password = $_POST['password'];
-    $role = $_POST['role'];
-    
-    $stmt = mysqli_prepare($conn, "SELECT id, password, role, full_name FROM users WHERE username = ? AND role = ?");
-    mysqli_stmt_bind_param($stmt, "ss", $username, $role);
-    mysqli_stmt_execute($stmt);
-    $res = mysqli_stmt_get_result($stmt);
-    
-    if($row = mysqli_fetch_assoc($res)) {
-        if(password_verify($password, $row['password'])) {
-            session_regenerate_id(true);
-            $_SESSION["user_id"] = $row['id'];
-            $_SESSION["role"] = $row['role'];
-            $_SESSION["full_name"] = $row['full_name'];
-            
-            setAlert('success', 'Success', 'Login successful');
-            
-            if($role == 'admin') header("Location: ../admin/admin_dashboard.php");
-            else header("Location: ../member/dashboard.php");
-            exit;
-        }
-    }
-    setAlert('error', 'Failed', 'Invalid credentials');
-}
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>Login</title>
-    <link rel="stylesheet" href="../assets/css/style.css">
-    <link rel="stylesheet" href="../assets/css/auth.css">
-</head>
-<body>
-    <div class="auth-container">
-        <div class="auth-box">
-            <h2>Login</h2>
-            <form class="auth-form" method="POST">
-                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-                
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" name="username" class="form-control" 
-                           pattern="[a-zA-Z0-9_]{3,20}" 
-                           title="Your username"
-                           required>
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" name="password" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label>Role</label>
-                    <select name="role" class="form-control">
-                        <option value="member">Student</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
-                <button class="btn btn-primary" style="width: 100%;">Login</button>
-            </form>
-            <div style="text-align: center; margin-top: 15px;">
-                <a href="register.php">Create Account</a>
-            </div>
-        </div>
-    </div>
-    <?php include '../includes/footer.php'; ?>
-</body>
-</html>
-</file>
-
 <file path="member/books.php">
 <?php
 require_once '../config/db.php';
@@ -5276,16 +5313,205 @@ while($row = mysqli_fetch_assoc($result_stats)) {
 </html>
 </file>
 
+<file path="admin/manage_book.php">
+<?php
+require_once '../config/db.php';
+requireAdmin();
+
+$search = $_GET['search'] ?? '';
+$category_filter = $_GET['category'] ?? '';
+
+$sql = "SELECT * FROM books WHERE 1=1";
+
+if($search) {
+    $search = mysqli_real_escape_string($conn, $search);
+    $sql .= " AND (title LIKE '%$search%' OR author LIKE '%$search%' OR isbn LIKE '%$search%')";
+}
+if($category_filter) {
+    $cat_safe = mysqli_real_escape_string($conn, $category_filter);
+    $sql .= " AND category = '$cat_safe'";
+}
+$sql .= " ORDER BY id DESC";
+$books = mysqli_query($conn, $sql);
+$cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Manage Books</title>
+    <!-- Add BOTH CSS files -->
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/admin.css"> <!-- THIS WAS MISSING -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="admin-container">
+        <?php include '../includes/admin_sidebar.php'; ?>
+        
+        <div class="main-content">
+            <div class="content-header">
+                <h1>Manage Books</h1>
+                <a href="add_book.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Book</a>
+            </div>
+            
+            <div class="card">
+                <!-- Search -->
+                <form method="GET" style="margin-bottom: 25px; display: flex; gap: 10px;">
+                    <input type="text" name="search" class="form-control" placeholder="Search..." value="<?= htmlspecialchars($search) ?>">
+                    <select name="category" class="form-control" style="width: 200px;">
+                        <option value="">All Categories</option>
+                        <?php while($c = mysqli_fetch_assoc($cat_query)): ?>
+                            <option value="<?= htmlspecialchars($c['name']) ?>" <?= ($category_filter == $c['name']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($c['name']) ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                    <button class="btn btn-primary">Filter</button>
+                    <?php if($search || $category_filter): ?>
+                        <a href="manage_book.php" class="btn btn-secondary">Clear</a>
+                    <?php endif; ?>
+                </form>
+
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Cover</th>
+                            <th>ISBN</th>
+                            <th>Title</th>
+                            <th>Stock</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    <?php if(mysqli_num_rows($books) > 0): ?>
+        <?php while($row = mysqli_fetch_assoc($books)): 
+            // Correct way to call the image
+            $img_path = getBookCover($row['cover_image']);
+        ?>
+        <tr>
+            <td>
+                <div style="width: 50px; height: 70px; background: #eee; border-radius: 4px; overflow: hidden; border: 1px solid #ddd;">
+                    <img src="<?= $img_path ?>" style="width: 100%; height: 100%; object-fit: cover;" alt="Cover">
+                </div>
+            </td>
+            <td style="font-family: monospace; color: #666;"><?= $row['isbn'] ?></td>
+            <td>
+                <strong><?= htmlspecialchars($row['title']) ?></strong><br>
+                <small><?= htmlspecialchars($row['author']) ?></small>
+            </td>
+            <td>
+                <?php if($row['available_copies'] > 0): ?>
+                    <span class="badge badge-success"><?= $row['available_copies'] ?> Available</span>
+                <?php else: ?>
+                    <span class="badge badge-danger">Out of Stock</span>
+                <?php endif; ?>
+            </td>
+            <td>
+                <a href="edit_book.php?id=<?= $row['id'] ?>" class="btn btn-primary" style="padding: 5px 10px;"><i class="fas fa-edit"></i></a>
+                <a href="delete_book.php?id=<?= $row['id'] ?>" class="btn btn-danger" style="padding: 5px 10px;" onclick="return confirm('Delete?');"><i class="fas fa-trash"></i></a>
+            </td>
+        </tr>
+        <?php endwhile; ?>
+    <?php else: ?>
+        <tr><td colspan="5" style="text-align: center;">No books found.</td></tr>
+    <?php endif; ?>
+</tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php include '../includes/footer.php'; ?>
+</body>
+</html>
+</file>
+
+<file path="auth/login.php">
+<?php
+require_once '../config/db.php';
+
+if($_SERVER["REQUEST_METHOD"] == "POST") {
+    verify_csrf();
+
+    $username = $_POST['username'];
+    $password = $_POST['password'];
+    $role = $_POST['role'];
+    
+    $stmt = mysqli_prepare($conn, "SELECT id, password, role, full_name FROM users WHERE username = ? AND role = ?");
+    mysqli_stmt_bind_param($stmt, "ss", $username, $role);
+    mysqli_stmt_execute($stmt);
+    $res = mysqli_stmt_get_result($stmt);
+    
+    if($row = mysqli_fetch_assoc($res)) {
+        if(password_verify($password, $row['password'])) {
+            session_regenerate_id(true);
+            $_SESSION["user_id"] = $row['id'];
+            $_SESSION["role"] = $row['role'];
+            $_SESSION["full_name"] = $row['full_name'];
+            
+            setAlert('success', 'Success', 'Login successful');
+            
+            if($role == 'admin') header("Location: ../admin/admin_dashboard.php");
+            else header("Location: ../member/dashboard.php");
+            exit;
+        }
+    }
+    setAlert('error', 'Failed', 'Invalid credentials');
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Login</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/auth.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <h2>Login</h2>
+            <form class="auth-form" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" name="username" class="form-control" 
+                           pattern="[a-zA-Z0-9_]{3,20}" 
+                           title="Your username"
+                           required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select name="role" class="form-control">
+                        <option value="member">Student</option>
+                        <option value="admin">Librarian</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" style="width: 100%;">Login</button>
+            </form>
+            <div style="text-align: center; margin-top: 15px;">
+                <a href="register.php">Create Account</a>
+            </div>
+        </div>
+    </div>
+    <?php include '../includes/footer.php'; ?>
+</body>
+</html>
+</file>
+
 <file path="includes/admin_sidebar.php">
 <div class="sidebar">
     <div class="sidebar-header">
-        <h3><i class="fas fa-book-reader"></i> LMS Admin</h3>
+        <h3><i class="fas fa-book-reader"></i> LMS Librarian</h3>
     </div>
     
     <div class="user-info">
         <div class="user-details">
             <h4 style="margin:0; font-size:16px; color: white;">
-                <?php echo htmlspecialchars($_SESSION['full_name'] ?? 'Admin'); ?>
+                <?php echo htmlspecialchars($_SESSION['full_name'] ?? 'Librarian'); ?>
             </h4>
             <span style="font-size:12px; color:#bdc3c7;">Librarian</span>
         </div>
@@ -5300,6 +5526,9 @@ while($row = mysqli_fetch_assoc($result_stats)) {
         </a>
         <a href="manage_members.php" class="menu-item">
             <i class="fas fa-users"></i> <span>Manage Students</span>
+        </a>
+        <a href="manage_requests.php" class="menu-item">
+            <i class="fas fa-envelope-open-text"></i> <span>Book Requests</span>
         </a>
         <a href="issue_book.php" class="menu-item">
             <i class="fas fa-hand-holding"></i> <span>Issue Book</span>

@@ -123,13 +123,16 @@ $page_title = "Home";
             <p style="font-size: 18px; color: #666; margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto;">
                 Join our library community today and access thousands of books. Whether you're a student or a librarian, we have the tools you need.
             </p>
-            <div style="display: flex; gap: 20px; justify-content: center;">
+          <div style="display: flex; gap: 20px; justify-content: center;">
                 <?php if(!isset($_SESSION['user_id'])): ?>
-                    <a href="auth/register.php" class="btn btn-primary" style="padding: 15px 40px; font-size: 18px;">
-                        <i class="fas fa-user-plus"></i> Sign Up Free
+                    <a href="auth/student_login.php" class="btn btn-primary" style="padding: 15px 30px; font-size: 16px;">
+                        <i class="fas fa-user-graduate"></i> Student Login
                     </a>
-                    <a href="auth/login.php" class="btn" style="padding: 15px 40px; font-size: 18px; background: #2c3e50; color: white;">
-                        <i class="fas fa-sign-in-alt"></i> Login
+                    <a href="auth/librarian_login.php" class="btn" style="padding: 15px 30px; font-size: 16px; background: #f72585; color: white;">
+                        <i class="fas fa-book-reader"></i> Librarian Login
+                    </a>
+                    <a href="auth/register.php" class="btn" style="padding: 15px 30px; font-size: 16px; background: #2c3e50; color: white;">
+                        Sign Up
                     </a>
                 <?php else: ?>
                     <a href="member/books.php" class="btn btn-primary" style="padding: 15px 40px; font-size: 18px;">
@@ -137,6 +140,7 @@ $page_title = "Home";
                     </a>
                 <?php endif; ?>
             </div>
+            
         </div>
     </section>
     
