@@ -45,7 +45,7 @@ requireAdmin();
                             <td><?= htmlspecialchars($m['full_name']) ?></td>
                             <td><?= htmlspecialchars($m['username']) ?></td>
                             <td><?= htmlspecialchars($m['email']) ?></td>
-                            <td><?= htmlspecialchars($m['phone']) ?></td>
+                            <td><?= htmlspecialchars($m['phone'] ?? '') ?></td>
                             <td>
                                 <a href="edit_member.php?id=<?= $m['id'] ?>" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;">Edit</a>
                                 <a href="generate_id.php?id=<?= $m['id'] ?>" target="_blank" class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;">ID Card</a>
