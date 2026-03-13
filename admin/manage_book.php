@@ -40,21 +40,31 @@ $cat_query = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC"
             
             <div class="card">
                 <!-- Search -->
-                <form method="GET" style="margin-bottom: 25px; display: flex; gap: 10px;">
-                    <input type="text" name="search" class="form-control" placeholder="Search..." value="<?= htmlspecialchars($search) ?>">
-                    <select name="category" class="form-control" style="width: 200px;">
-                        <option value="">All Categories</option>
-                        <?php while($c = mysqli_fetch_assoc($cat_query)): ?>
-                            <option value="<?= htmlspecialchars($c['name']) ?>" <?= ($category_filter == $c['name']) ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($c['name']) ?>
-                            </option>
-                        <?php endwhile; ?>
-                    </select>
-                    <button class="btn btn-primary">Filter</button>
-                    <?php if($search || $category_filter): ?>
-                        <a href="manage_book.php" class="btn btn-secondary">Clear</a>
-                    <?php endif; ?>
-                </form>
+                <!-- Search -->
+<form method="GET" action="manage_book.php" style="margin-bottom: 25px; display: flex; gap: 10px;">
+    <input type="text" name="search" class="form-control" placeholder="Search title, author..." value="<?= htmlspecialchars($search) ?>">
+    
+    <!-- ADDED: onchange="this.form.submit()" triggers instant filtering -->
+    <select name="category" class="form-control" style="width: 200px;" onchange="this.form.submit()">
+        <option value="">All Categories</option>
+        <?php 
+        // Reset internal pointer in case it was used elsewhere, though not strictly required here
+        mysqli_data_seek($cat_query, 0);
+        while($c = mysqli_fetch_assoc($cat_query)): 
+        ?>
+            <option value="<?= htmlspecialchars($c['name']) ?>" <?= ($category_filter == $c['name']) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($c['name']) ?>
+            </option>
+        <?php endwhile; ?>
+    </select>
+    
+    <!-- ADDED: type="submit" guarantees the button works across all browsers -->
+    <button type="submit" class="btn btn-primary">Filter</button>
+    
+    <?php if($search || $category_filter): ?>
+        <a href="manage_book.php" class="btn btn-secondary" style="padding: 10px 20px; line-height: normal;">Clear</a>
+    <?php endif; ?>
+</form>
 
                 <table class="table">
                     <thead>

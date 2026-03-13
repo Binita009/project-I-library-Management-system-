@@ -2,9 +2,8 @@
 require_once '../config/db.php';
 requireMember();
 
-// Wrap them in mysqli_real_escape_string
-$search = mysqli_real_escape_string($conn, $_GET['search'] ?? '');
-$cat = mysqli_real_escape_string($conn, $_GET['category'] ?? '');
+$search = $_GET['search'] ?? '';
+$cat = $_GET['category'] ?? '';
 
 $sql = "SELECT * FROM books WHERE 1=1";
 if ($search) $sql .= " AND title LIKE '%$search%'";
@@ -19,6 +18,78 @@ $result = mysqli_query($conn, $sql);
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- ADDED INTERNAL STYLES TO FORCE THE FIX -->
+    <style>
+        .books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .book-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 1px solid #eee;
+        }
+
+        .book-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .book-cover-img {
+            width: 100%;
+            height: 280px; 
+            object-fit: cover; 
+            border-bottom: 1px solid #eee;
+            background: #f8f9fa;
+        }
+
+        .book-info {
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1; 
+        }
+
+        .book-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            line-height: 1.3;
+        }
+
+        .book-author {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-bottom: 15px;
+        }
+
+        .stock-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .in-stock {
+            background: rgba(46, 204, 113, 0.15);
+            color: #27ae60;
+        }
+
+        .out-stock {
+            background: rgba(231, 76, 60, 0.15);
+            color: #c0392b;
+        }
+    </style>
 </head>
 <body>
 <div class="admin-container">
