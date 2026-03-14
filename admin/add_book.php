@@ -15,20 +15,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $copies   = (int)$_POST['copies'];
     
     $cover = 'default.png';
+    $ebook_file = NULL; // Variable for ebook
+
+    // Handle Cover Image Upload
     if(isset($_FILES['cover']) && $_FILES['cover']['error'] == 0) {
         $ext = pathinfo($_FILES['cover']['name'], PATHINFO_EXTENSION);
         $new_name = uniqid() . "." . $ext;
-        
-        // Use an absolute path to save the file
-        // Safe relative directory creation
-$target_dir = __DIR__ . "/../assets/uploads/";
+        $target_dir = __DIR__ . "/../assets/uploads/";
 
-// Automatically create the uploads folder if it doesn't exist yet
-if (!is_dir($target_dir)) {
-    mkdir($target_dir, 0777, true);
-}
+        if (!is_dir($target_dir)) { mkdir($target_dir, 0777, true); }
         if(move_uploaded_file($_FILES['cover']['tmp_name'], $target_dir . $new_name)) {
             $cover = $new_name;
+        }
+    }
+
+    // Handle E-book PDF Upload
+    if(isset($_FILES['ebook']) && $_FILES['ebook']['error'] == 0) {
+        $ext = strtolower(pathinfo($_FILES['ebook']['name'], PATHINFO_EXTENSION));
+        if($ext == 'pdf') {
+            $ebook_name = uniqid() . "_ebook.pdf";
+            $ebook_dir = __DIR__ . "/../assets/ebooks/";
+            
+            if (!is_dir($ebook_dir)) { mkdir($ebook_dir, 0777, true); }
+            if(move_uploaded_file($_FILES['ebook']['tmp_name'], $ebook_dir . $ebook_name)) {
+                $ebook_file = $ebook_name;
+            }
         }
     }
 
@@ -37,9 +48,9 @@ if (!is_dir($target_dir)) {
         $check = mysqli_query($conn, "SELECT id FROM books WHERE isbn = '$isbn'");
         if(mysqli_num_rows($check) > 0) throw new Exception("ISBN exists.");
 
-        $sql = "INSERT INTO books (title, author, isbn, category, total_copies, available_copies, cover_image) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO books (title, author, isbn, category, total_copies, available_copies, cover_image, ebook_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = mysqli_prepare($conn, $sql);
-        mysqli_stmt_bind_param($stmt, "ssssiis", $title, $author, $isbn, $category, $copies, $copies, $cover);
+        mysqli_stmt_bind_param($stmt, "ssssiiss", $title, $author, $isbn, $category, $copies, $copies, $cover, $ebook_file);
         mysqli_stmt_execute($stmt);
         $book_id = mysqli_insert_id($conn);
         
@@ -103,8 +114,20 @@ if (!is_dir($target_dir)) {
                         </div>
                         <div class="form-group" style="flex:1"><label>Copies</label><input type="number" name="copies" class="form-control" value="1" min="1" required></div>
                     </div>
-                    <div class="form-group"><label>Cover Image</label><input type="file" name="cover" class="form-control" accept="image/*"></div>
-                    <button class="btn btn-primary">Add Book</button>
+                    
+                    <div class="form-row" style="display: flex; gap: 20px;">
+                        <div class="form-group" style="flex:1">
+                            <label>Cover Image (JPG/PNG)</label>
+                            <input type="file" name="cover" class="form-control" accept="image/*">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>E-Book File (PDF Optional)</label>
+                            <input type="file" name="ebook" class="form-control" accept=".pdf">
+                            <small style="color: #7f8c8d;">Upload a PDF version for students to read online.</small>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" style="margin-top: 15px;">Add Book</button>
                 </form>
             </div>
         </div>

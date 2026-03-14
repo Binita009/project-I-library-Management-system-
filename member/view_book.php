@@ -64,21 +64,33 @@ mysqli_stmt_close($stmt3);
 
     <div class="main-content">
         <div class="content-header">
-            <a href="books.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+            <!-- Left Side: Back & E-book buttons -->
+            <div style="display: flex; gap: 15px;">
+                <a href="books.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+                
+                <?php if(!empty($book['ebook_file'])): ?>
+                    <a href="../assets/ebooks/<?= htmlspecialchars($book['ebook_file']) ?>" target="_blank" class="btn btn-success" style="background: #27ae60; color: white;">
+                        <i class="fas fa-book-reader"></i> Read E-Book Now
+                    </a>
+                <?php endif; ?>
+            </div>
             
-            <?php if($has_pending_request): ?>
-                <button class="btn btn-secondary" disabled><i class="fas fa-clock"></i> Request Pending</button>
-            <?php elseif($is_borrowed): ?>
-                <button class="btn btn-secondary" disabled>Currently Borrowed</button>
-            <?php elseif($book['available_copies'] > 0): ?>
-                <form action="request_book.php" method="POST" style="display:inline;">
-                    <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-                    <input type="hidden" name="book_id" value="<?= $book['id'] ?>">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-hand-paper"></i> Request this Book</button>
-                </form>
-            <?php else: ?>
-                <button class="btn btn-secondary" disabled>Out of Stock</button>
-            <?php endif; ?>
+            <!-- Right Side: Request/Status buttons -->
+            <div>
+                <?php if($has_pending_request): ?>
+                    <button class="btn btn-secondary" disabled><i class="fas fa-clock"></i> Request Pending</button>
+                <?php elseif($is_borrowed): ?>
+                    <button class="btn btn-secondary" disabled>Currently Borrowed</button>
+                <?php elseif($book['available_copies'] > 0): ?>
+                    <form action="request_book.php" method="POST" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                        <input type="hidden" name="book_id" value="<?= $book['id'] ?>">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-hand-paper"></i> Request Physical Book</button>
+                    </form>
+                <?php else: ?>
+                    <button class="btn btn-secondary" disabled>Physical Copy Out of Stock</button>
+                <?php endif; ?>
+            </div>
         </div>
 
         <div class="card" style="max-width: 800px; margin: 0 auto;">
@@ -92,11 +104,11 @@ mysqli_stmt_close($stmt3);
                 <div style="text-align: right;">
                     <?php if($book['available_copies'] > 0): ?>
                         <span class="badge badge-success" style="font-size: 14px; padding: 10px 15px;">
-                            <i class="fas fa-check-circle"></i> Available
+                            <i class="fas fa-check-circle"></i> Physical Copy Available
                         </span>
                     <?php else: ?>
                         <span class="badge badge-danger" style="font-size: 14px; padding: 10px 15px;">
-                            <i class="fas fa-times-circle"></i> Out of Stock
+                            <i class="fas fa-times-circle"></i> Physical Out of Stock
                         </span>
                     <?php endif; ?>
                 </div>
@@ -107,7 +119,7 @@ mysqli_stmt_close($stmt3);
             <!-- User Borrow Status Notification -->
             <?php if($is_borrowed): ?>
                 <div class="alert alert-warning" style="background: #fff3cd; color: #856404; border: 1px solid #ffeeba;">
-                    <i class="fas fa-info-circle"></i> <strong>Note:</strong> You currently have a copy of this book borrowed. 
+                    <i class="fas fa-info-circle"></i> <strong>Note:</strong> You currently have a physical copy of this book borrowed. 
                     <a href="issued_books.php">Check Due Date</a>
                 </div>
             <?php endif; ?>
