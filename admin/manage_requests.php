@@ -15,31 +15,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && isset($_P
             $book_id = $req_info['book_id'];
             $user_id = $req_info['user_id'];
             
-            // Look for an available physical copy
-            $copy = mysqli_fetch_assoc(mysqli_query($conn, "SELECT id FROM book_copies WHERE book_id = $book_id AND status = 'available' LIMIT 1"));
+            // NEW FIX: Check if student already has this book borrowed
+            $has_book_check = mysqli_query($conn, "SELECT id FROM issued_books WHERE user_id = $user_id AND book_id = $book_id AND status = 'issued'");
             
-            if($copy) {
-                $copy_id = $copy['id'];
-                $due_date = date('Y-m-d', strtotime('+15 days')); // Default 15 days borrowing period
-                
-                mysqli_begin_transaction($conn);
-                try {
-                    // Issue the book
-                    mysqli_query($conn, "INSERT INTO issued_books (book_id, copy_id, user_id, issue_date, due_date, status) VALUES ($book_id, $copy_id, $user_id, CURDATE(), '$due_date', 'issued')");
-                    mysqli_query($conn, "UPDATE book_copies SET status='issued' WHERE id=$copy_id");
-                    mysqli_query($conn, "UPDATE books SET available_copies=available_copies-1 WHERE id=$book_id");
-                    
-                    // Mark request as approved
-                    mysqli_query($conn, "UPDATE book_requests SET status = 'approved' WHERE id = $req_id");
-                    
-                    mysqli_commit($conn);
-                    setAlert('success', 'Approved', 'Request approved. Book has been issued!');
-                } catch (Exception $e) {
-                    mysqli_rollback($conn);
-                    setAlert('error', 'Error', 'Failed to issue the book.');
-                }
+            if (mysqli_num_rows($has_book_check) > 0) {
+                setAlert('error', 'Action Denied', 'This student already has a copy of this book issued. You cannot approve this request.');
             } else {
-                setAlert('error', 'Out of Stock', 'No copies available to issue right now.');
+                // Look for an available physical copy
+                $copy = mysqli_fetch_assoc(mysqli_query($conn, "SELECT id FROM book_copies WHERE book_id = $book_id AND status = 'available' LIMIT 1"));
+                
+                if($copy) {
+                    $copy_id = $copy['id'];
+                    $due_date = date('Y-m-d', strtotime('+15 days')); // Default 15 days borrowing period
+                    
+                    mysqli_begin_transaction($conn);
+                    try {
+                        // Issue the book
+                        mysqli_query($conn, "INSERT INTO issued_books (book_id, copy_id, user_id, issue_date, due_date, status) VALUES ($book_id, $copy_id, $user_id, CURDATE(), '$due_date', 'issued')");
+                        mysqli_query($conn, "UPDATE book_copies SET status='issued' WHERE id=$copy_id");
+                        mysqli_query($conn, "UPDATE books SET available_copies=available_copies-1 WHERE id=$book_id");
+                        
+                        // Mark request as approved
+                        mysqli_query($conn, "UPDATE book_requests SET status = 'approved' WHERE id = $req_id");
+                        
+                        mysqli_commit($conn);
+                        setAlert('success', 'Approved', 'Request approved. Book has been issued!');
+                    } catch (Exception $e) {
+                        mysqli_rollback($conn);
+                        setAlert('error', 'Error', 'Failed to issue the book.');
+                    }
+                } else {
+                    setAlert('error', 'Out of Stock', 'No physical copies available to issue right now.');
+                }
             }
         }
     } elseif ($action === 'reject') {

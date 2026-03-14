@@ -17,16 +17,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($copy_id && $user_id) {
         mysqli_begin_transaction($conn);
         try {
+            // Get the book_id of the selected copy
             $book_check = mysqli_fetch_assoc(mysqli_query($conn, "SELECT book_id FROM book_copies WHERE id=$copy_id AND status='available'"));
+            
             if ($book_check) {
                 $book_id = $book_check['book_id'];
-                mysqli_query($conn, "INSERT INTO issued_books (book_id, copy_id, user_id, issue_date, due_date, status) VALUES ($book_id, $copy_id, $user_id, CURDATE(), '$due_date', 'issued')");
-                mysqli_query($conn, "UPDATE book_copies SET status='issued' WHERE id=$copy_id");
-                mysqli_query($conn, "UPDATE books SET available_copies=available_copies-1 WHERE id=$book_id");
-                mysqli_commit($conn);
-                setAlert('success', 'Success', 'Book issued successfully!');
-                header("Location: issue_book.php");
-                exit;
+                
+                // NEW FIX: Check if the student already has a copy of this book issued
+                $has_book_check = mysqli_query($conn, "SELECT id FROM issued_books WHERE user_id = $user_id AND book_id = $book_id AND status = 'issued'");
+                
+                if (mysqli_num_rows($has_book_check) > 0) {
+                    // Prevent issuing if they already have it
+                    setAlert('error', 'Action Denied', 'This student already has a copy of this book currently issued!');
+                } else {
+                    // Proceed to issue the book
+                    mysqli_query($conn, "INSERT INTO issued_books (book_id, copy_id, user_id, issue_date, due_date, status) VALUES ($book_id, $copy_id, $user_id, CURDATE(), '$due_date', 'issued')");
+                    mysqli_query($conn, "UPDATE book_copies SET status='issued' WHERE id=$copy_id");
+                    mysqli_query($conn, "UPDATE books SET available_copies=available_copies-1 WHERE id=$book_id");
+                    
+                    // Also automatically clear any pending requests for this book by this student
+                    mysqli_query($conn, "UPDATE book_requests SET status='approved' WHERE user_id=$user_id AND book_id=$book_id AND status='pending'");
+                    
+                    mysqli_commit($conn);
+                    setAlert('success', 'Success', 'Book issued successfully!');
+                    header("Location: issue_book.php");
+                    exit;
+                }
             } else {
                 setAlert('error', 'Error', 'Book copy not available.');
             }
@@ -42,15 +58,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <title>Issue Book</title>
     <link rel="stylesheet" href="../assets/css/style.css">
-    <link rel="stylesheet" href="../assets/css/admin.css"> <!-- Add this line -->
+    <link rel="stylesheet" href="../assets/css/admin.css"> 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <div class="admin-container">
-        <!-- 1. Include Sidebar -->
         <?php include '../includes/admin_sidebar.php'; ?>
         
-        <!-- 2. Main Content Area -->
         <div class="main-content">
             <div class="content-header">
                 <h1>Issue Book</h1>

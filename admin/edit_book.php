@@ -34,11 +34,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $cover_sql_part = ", cover_image = '$new_name'";
             }
         }
-        $sql = "UPDATE books SET title=?, author=?, isbn=?, category=?, total_copies=?, available_copies=? $cover_sql_part WHERE id=?";
+
+        $ebook_sql_part = "";
+        if(isset($_FILES['ebook']) && $_FILES['ebook']['error'] == 0) {
+            $ext = strtolower(pathinfo($_FILES['ebook']['name'], PATHINFO_EXTENSION));
+            if($ext == 'pdf') {
+                $ebook_new_name = uniqid() . "_ebook.pdf";
+                $ebook_dir = __DIR__ . "/../assets/ebooks/";
+                if (!is_dir($ebook_dir)) { mkdir($ebook_dir, 0777, true); }
+                if(move_uploaded_file($_FILES['ebook']['tmp_name'], $ebook_dir . $ebook_new_name)) {
+                    $ebook_sql_part = ", ebook_file = '$ebook_new_name'";
+                }
+            }
+        }
+
+        $sql = "UPDATE books SET title=?, author=?, isbn=?, category=?, total_copies=?, available_copies=? $cover_sql_part $ebook_sql_part WHERE id=?";
         $stmt = mysqli_prepare($conn, $sql);
         mysqli_stmt_bind_param($stmt, "ssssiii", $title, $author, $isbn, $cat, $total, $new_available, $id);
+        
         if (mysqli_stmt_execute($stmt)) {
-            setAlert('success', 'Updated', 'Book updated');
+            setAlert('success', 'Updated', 'Book updated successfully');
             header("Location: manage_book.php");
             exit;
         }
@@ -87,9 +102,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </div>
                         <div class="form-group" style="flex:1"><label>Total Copies</label><input type="number" name="total_copies" class="form-control" value="<?= $book['total_copies'] ?>" required></div>
                     </div>
-                    <div class="form-group"><label>Cover Image</label><input type="file" name="cover" class="form-control"></div>
-                    <button class="btn btn-primary">Update Book</button>
-                    <a href="manage_book.php" class="btn btn-danger">Cancel</a>
+                    
+                    <div class="form-row" style="display: flex; gap: 20px; align-items: flex-end;">
+                        <div class="form-group" style="flex:1">
+                            <label>Cover Image (Leave blank to keep current)</label>
+                            <input type="file" name="cover" class="form-control" accept="image/*">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>E-Book File (PDF)</label>
+                            <?php if(!empty($book['ebook_file'])): ?>
+                                <p style="margin-bottom: 5px; color: #27ae60; font-size: 13px;"><i class="fas fa-check-circle"></i> Current E-book is uploaded.</p>
+                            <?php endif; ?>
+                            <input type="file" name="ebook" class="form-control" accept=".pdf">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" style="margin-top: 15px;">Update Book</button>
+                    <a href="manage_book.php" class="btn btn-danger" style="margin-top: 15px;">Cancel</a>
                 </form>
             </div>
         </div>
