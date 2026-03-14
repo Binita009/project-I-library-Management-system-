@@ -18,24 +18,35 @@ mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
 $book = mysqli_fetch_assoc($result);
 
+// CLOSE STMT 1 to prevent "Commands out of sync"
+mysqli_stmt_close($stmt);
+
 if (!$book) {
     echo "Book not found.";
     exit;
 }
 
 // 2. Check if the current user has this book issued
-$status_sql = "SELECT * FROM issued_books WHERE user_id = ? AND book_id = ? AND status = 'issued'";
+$status_sql = "SELECT id FROM issued_books WHERE user_id = ? AND book_id = ? AND status = 'issued'";
 $stmt2 = mysqli_prepare($conn, $status_sql);
 mysqli_stmt_bind_param($stmt2, "ii", $user_id, $book_id);
 mysqli_stmt_execute($stmt2);
-$is_borrowed = mysqli_stmt_fetch($stmt2);
+mysqli_stmt_store_result($stmt2); // Store result to check row count safely
+$is_borrowed = mysqli_stmt_num_rows($stmt2) > 0;
+
+// CLOSE STMT 2
+mysqli_stmt_close($stmt2);
 
 // 3. Check if the current user already requested this book
-$req_sql = "SELECT * FROM book_requests WHERE user_id = ? AND book_id = ? AND status = 'pending'";
+$req_sql = "SELECT id FROM book_requests WHERE user_id = ? AND book_id = ? AND status = 'pending'";
 $stmt3 = mysqli_prepare($conn, $req_sql);
 mysqli_stmt_bind_param($stmt3, "ii", $user_id, $book_id);
 mysqli_stmt_execute($stmt3);
-$has_pending_request = mysqli_stmt_fetch($stmt3);
+mysqli_stmt_store_result($stmt3); // Store result
+$has_pending_request = mysqli_stmt_num_rows($stmt3) > 0;
+
+// CLOSE STMT 3
+mysqli_stmt_close($stmt3);
 ?>
 <!DOCTYPE html>
 <html lang="en">
