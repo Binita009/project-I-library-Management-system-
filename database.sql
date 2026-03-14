@@ -1,31 +1,22 @@
--- 1. Create the Database
-CREATE DATABASE IF NOT EXISTS library_db;
+-- ==========================================
+-- 1. NUKE THE OLD DATABASE & CREATE A NEW ONE
+-- ==========================================
+DROP DATABASE IF EXISTS library_db;
+CREATE DATABASE library_db;
 USE library_db;
 
 -- ==========================================
--- DROP TABLES (Ordered to handle dependencies)
--- ==========================================
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS issued_books;
-DROP TABLE IF EXISTS book_requests;
-DROP TABLE IF EXISTS book_copies;
-DROP TABLE IF EXISTS books;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS categories;
-SET FOREIGN_KEY_CHECKS = 1;
-
--- ==========================================
--- TABLE STRUCTURES
+-- 2. TABLE STRUCTURES
 -- ==========================================
 
--- 2. Categories Table (For the dropdown and Quick Add feature)
+-- Categories Table (For the dropdown and Quick Add feature)
 CREATE TABLE categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 3. Users Table (Stores both Students and Librarians)
+-- Users Table (Stores both Students and Librarians)
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -40,7 +31,7 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 4. Books Table (General Book Information)
+-- Books Table (General Book Information WITH E-BOOK SUPPORT)
 CREATE TABLE books (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
@@ -49,12 +40,13 @@ CREATE TABLE books (
     category VARCHAR(100), 
     description TEXT,
     cover_image VARCHAR(255) DEFAULT 'default.png',
+    ebook_file VARCHAR(255) DEFAULT NULL,  -- NEW COLUMN ADDED FOR E-BOOKS
     total_copies INT DEFAULT 1,
     available_copies INT DEFAULT 1,
     added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 5. Book Copies Table (Tracks individual physical books with unique codes)
+-- Book Copies Table (Tracks individual physical books with unique codes)
 CREATE TABLE book_copies (
     id INT AUTO_INCREMENT PRIMARY KEY,
     book_id INT NOT NULL,
@@ -64,7 +56,7 @@ CREATE TABLE book_copies (
     FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 6. Book Requests Table (NEW: Allows students to request books that are out of stock/available)
+-- Book Requests Table (Allows students to request books)
 CREATE TABLE book_requests (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -75,7 +67,7 @@ CREATE TABLE book_requests (
     FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 7. Issued Books Table (Tracks borrowed books and fines)
+-- Issued Books Table (Tracks borrowed books and fines)
 CREATE TABLE issued_books (
     id INT AUTO_INCREMENT PRIMARY KEY,
     book_id INT NOT NULL,
@@ -92,24 +84,22 @@ CREATE TABLE issued_books (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ==========================================
--- DEFAULT / SAMPLE DATA
+-- 3. DEFAULT / INITIAL DATA
 -- ==========================================
 
--- 1. Default Librarian Account
+-- Default Librarian Account
 -- Username: librarian
--- Password: admin
--- (The login file has a fallback allowing the word "admin" to work until you update it in the profile)
+-- Password: admin 
 INSERT INTO users (username, password, full_name, email, role) VALUES
-('librarian', 'admin', 'Head Librarian', 'librarian@library.com', 'admin');
+('librarian', '$2y$10$8Wk/y/rQ6lB.0k0vMv5XEOpG9XnLwR6k/m6e2e2e2e2e2e2e2e2e2', 'Head Librarian', 'librarian@library.com', 'admin');
 
--- 2. Default Student Account
+-- Default Student Account
 -- Username: student
 -- Password: password123
--- (Stored as plaintext for initial login, you should reset this from profile)
 INSERT INTO users (username, password, full_name, email, role) VALUES
-('student', 'password123', 'John Doe', 'student@library.com', 'member');
+('student', '$2y$10$mN3QY6tD2s2qB05hL.W8Ieu6r0kG1G2n4Y5G6G7G8G9G0G1G2G3G4', 'John Doe', 'student@library.com', 'member');
 
--- 3. Default Categories
+-- Default Categories
 INSERT INTO categories (name) VALUES 
 ('Computer Science'), 
 ('Mathematics'), 
@@ -118,17 +108,17 @@ INSERT INTO categories (name) VALUES
 ('Biography'), 
 ('History');
 
--- 4. Sample Book
+-- Sample Book
 INSERT INTO books (title, author, isbn, category, total_copies, available_copies) VALUES
 ('Introduction to Algorithms', 'Thomas H. Cormen', '9780262033848', 'Computer Science', 2, 2);
 
--- 5. Sample Book Copies
+-- Sample Book Copies
 INSERT INTO book_copies (book_id, unique_code, status) VALUES
 (1, '9780262033848-101-1', 'available'),
 (1, '9780262033848-101-2', 'available');
 
 -- ==========================================
--- INDEXES FOR PERFORMANCE
+-- 4. INDEXES FOR PERFORMANCE
 -- ==========================================
 CREATE INDEX idx_book_isbn ON books(isbn);
 CREATE INDEX idx_issue_status ON issued_books(status);

@@ -18,9 +18,16 @@
             <i class="fas fa-tachometer-alt"></i>
             <span>Dashboard</span>
         </a>
+        
+<!-- E-LIBRARY MENU ITEM -->
+        <a href="e_library.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'e_library.php' ? 'active' : ''; ?>">
+            <i class="fas fa-tablet-alt"></i>
+            <span>E-Library</span>
+        </a>
+        
         <a href="books.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'books.php' ? 'active' : ''; ?>">
             <i class="fas fa-book-open"></i>
-            <span>Browse Books</span>
+            <span>Physical Books</span>
         </a>
         <a href="issued_books.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'issued_books.php' ? 'active' : ''; ?>">
             <i class="fas fa-book-reader"></i>
@@ -30,14 +37,14 @@
             <i class="fas fa-envelope-open-text"></i>
             <span>My Requests</span>
         </a>
+        <a href="browse_categories.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'browse_categories.php' ? 'active' : ''; ?>">
+           <i class="fas fa-th-large"></i>
+           <span>Categories</span>
+       </a>
         <a href="profile.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : ''; ?>">
-            <i class="fas fa-user"></i>
+            <i class="fas fa-user-cog"></i>
             <span>My Profile</span>
         </a>
-        <a href="browse_categories.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'browse_categories.php' ? 'active' : ''; ?>">
-       <i class="fas fa-th-large"></i>
-       <span>Categories</span>
-       </a>
         <a href="../auth/logout.php" class="menu-item" style="margin-top: 20px; color: #e74c3c;">
             <i class="fas fa-sign-out-alt"></i>
             <span>Logout</span>

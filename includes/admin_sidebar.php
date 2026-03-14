@@ -30,7 +30,13 @@
         </a>
         <a href="return_book.php" class="menu-item">
             <i class="fas fa-undo"></i> <span>Return Book</span>
+
         </a>
+            <!-- NEW MENU ITEM WE JUST ADDED -->
+        <a href="active_issues.php" class="menu-item">
+            <i class="fas fa-list-alt"></i> <span>Active Issues</span>
+        </a>
+        <!-- END OF NEW MENU ITEM -->
         <a href="fines.php" class="menu-item">
             <i class="fas fa-coins"></i> <span>Fines</span>
         </a>
