@@ -18,6 +18,11 @@
             <i class="fas fa-tachometer-alt"></i>
             <span>Dashboard</span>
         </a>
+
+                <a href="notifications.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : ''; ?>">
+            <i class="fas fa-bell"></i>
+            <span>Notifications</span>
+        </a>
         
 <!-- E-LIBRARY MENU ITEM -->
         <a href="e_library.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) == 'e_library.php' ? 'active' : ''; ?>">
