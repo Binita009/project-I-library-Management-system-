@@ -9,7 +9,16 @@ function csrf_token() {
 }
 
 function verify_csrf() {
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    
+    // FIX: Handle cases where a file upload exceeds PHP's 'post_max_size' limit.
+    // When this happens, PHP drops the entire $_POST array, including our csrf_token.
+    if (isset($_SERVER['CONTENT_LENGTH']) && (int)$_SERVER['CONTENT_LENGTH'] > 0 && empty($_POST)) {
+        die("Security Validation Failed: The uploaded file exceeds the server's maximum size limit. Please go back, refresh, and try a smaller file.");
+    }
+
+    // FIX: Check if the session token is set to prevent "Undefined array key" PHP warnings.
+    if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         die("Security Validation Failed. Please go back and refresh.");
     }
 }
